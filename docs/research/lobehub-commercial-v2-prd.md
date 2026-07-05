@@ -1231,6 +1231,108 @@ RBAC 角色（技术权限）
 
 ---
 
+## 十二、补充与优化（审查遗漏清单）
+
+### 12.1 安全与并发
+
+| # | 问题 | 风险 | 方案 |
+|---|------|------|------|
+| 1 | **积分并发消费** | 用户同时发多条消息，积分余额检查与扣减非原子操作 → 可能透支 | `credit_transactions` 加悲观锁 `SELECT ... FOR UPDATE` 或乐观锁版本号；余额检查+扣减在同一 DB 事务中 |
+| 2 | **支付回调幂等** | 微信可能重复回调同一订单 | `payment_orders` 状态机：`pending → paid` 只允许一次，已支付订单忽略重复回调 |
+| 3 | **流式对话中积分不足** | Token 持续消耗，余额中途归零 | `beforeInvoke` 预估消耗并预扣；`afterInvoke` 多退少补；中间余额不足时中断流式返回 + 前端提示 |
+| 4 | **退款安全** | 已消费积分的订单退款可能造成积分负数 | 退款前检查：`balanceAfterRefund ≥ 0`；已消费积分不可退款 |
+
+### 12.2 积分过期
+
+| # | 问题 | 方案 |
+|---|------|------|
+| 5 | `creditExpiryDays` 配置了但从未执行 | 每日定时任务：`DELETE FROM credit_transactions WHERE created_at < NOW() - INTERVAL 'N days' AND type IN ('bonus', 'top_up') AND amount > 0`；或标记过期而非删除，保留审计轨迹 |
+| 6 | 过期提醒 | 积分到期前 7 天/3 天通过通知系统提醒用户 |
+
+### 12.3 vip_user 迁移
+
+| # | 问题 | 方案 |
+|---|------|------|
+| 7 | 旧 `vip_user` 角色何去何从 | 保留角色定义（不删），但不再分配给新用户；`useUserRoles` 优先级：`super_admin > pro_user > vip_user > free_user`；向后兼容已有的 vip_user |
+| 8 | 已有用户数据兼容 | 现有用户 `membershipLevelId = NULL` → 视为 Free；首次充值/订阅后自动设置 |
+
+### 12.4 运行时边界
+
+| # | 问题 | 方案 |
+|---|------|------|
+| 9 | `personalBudget` / `workspaceBudget` 运行时检查 | 在 `creditBalanceCheck` 中间件增加预算上限检查：`SUM(spend_logs.totalCost WHERE period = current) ≤ budget` |
+| 10 | Pro 降 Free 后已有 agent 处理 | agent 不删除，所有权保留；但不能创建新的；已发布到 Discover 的 agent 保持已发布状态（不自动下架） |
+| 11 | 支付超时关单 | 定时任务每分钟检查 `payment_orders WHERE status='pending' AND expired_at < NOW()` → 更新为 `expired` |
+
+### 12.5 页面状态
+
+| # | 问题 | 方案 |
+|---|------|------|
+| 12 | **错误状态** | 支付失败 → toast "支付失败，请重试" + 关闭 Modal；订单查询失败 → 空状态 "暂无订单" |
+| 13 | **加载状态** | 套餐对比页：Skeleton Card 占位；积分余额：Spin 占位；交易记录：Skeleton List |
+| 14 | **空状态** | 无交易记录 → "还没有积分记录，去充值吧" + CTA 按钮；无邀请记录 → "邀请好友，双方各得积分" + 分享按钮 |
+| 15 | **移动端适配** | 套餐卡片堆叠（非横向排列）；功能对比表折叠为 Accordion；支付 Modal 全屏 |
+
+### 12.6 通知集成
+
+| # | 事件 | 通道 | 时机 |
+|---|------|------|------|
+| 16 | 积分不足 | 站内信 + 邮件 | 余额 ≤ 低积分阈值（admin 可配） |
+| 17 | 订阅即将到期 | 站内信 + 邮件 | 到期前 7/3/1 天 |
+| 18 | 订阅成功 | 站内信 | 支付成功后立即 |
+| 19 | 自动降级 | 站内信 | 等级变更时 |
+| 20 | 邀请奖励到账 | 站内信 | 被邀请人注册成功后 |
+| 21 | 退款处理完成 | 站内信 | 审核通过/拒绝后 |
+
+### 12.7 i18n 待补充
+
+```
+src/locales/default/
+├── billing.ts          # [NEW] 计费相关（套餐/积分/支付/邀请）
+│   ├── plans.title, plans.free, plans.proMonthly, plans.proYearly
+│   ├── credits.title, credits.balance, credits.recharge, credits.history
+│   ├── payment.confirm, payment.qrcode, payment.success, payment.failed
+│   ├── referral.title, referral.code, referral.link, referral.stats
+│   └── upgrade.title, upgrade.description, upgrade.subscribe
+└── auth.ts             # [MODIFY] 新增 pro_user 角色描述
+```
+
+### 12.8 全局开关
+
+| # | 问题 | 方案 |
+|---|------|------|
+| 22 | `enableBusinessFeatures` flag | 当前仅在 desktop/Electron 环境启用；需扩展支持 Web 端：通过 `ENABLE_BUSINESS_FEATURES` 环境变量或 feature flag 控制 |
+| 23 | 商业化功能灰度 | 通过 feature flag 按用户 ID 数组灰度开启，如 `["user_a", "user_b"]` |
+
+### 12.9 开发阶段补充
+
+| # | 任务 | 并入阶段 |
+|---|------|---------|
+| 24 | `creditBalanceCheck` 中间件加悲观锁 | 阶段 2️⃣ |
+| 25 | 支付回调幂等性 | 阶段 4️⃣ |
+| 26 | 积分过期定时任务 | 阶段 4️⃣ |
+| 27 | Pro 降级 Agent 处理策略 | 阶段 4️⃣ |
+| 28 | vip_user 向后兼容 | 阶段 1️⃣ |
+| 29 | 加载/错误/空状态组件 | 阶段 5️⃣ |
+| 30 | 通知事件对接 | 阶段 4️⃣ |
+| 31 | `billing.ts` i18n 文件 | 阶段 5️⃣ |
+| 32 | mobile 适配 | 阶段 5️⃣ |
+| 33 | `enableBusinessFeatures` 扩展 | 阶段 1️⃣ |
+| 34 | flash 消费确认 | 阶段 2️⃣ |
+| 35 | 支付超时关单定时任务 | 阶段 4️⃣ |
+| 36 | 预算上限运行时检查 | 阶段 2️⃣ |
+
+---
+
+## 十三、开发分支
+
+| 分支 | 用途 | 状态 |
+|------|------|------|
+| `feature/commercial-saas-v1` | 基础设施搭建（Schema/Model/Router/Admin UI） | ✅ 已完成 |
+| **`feature/commercial-saas-v2`** | **商业逻辑实现（RBAC重构+积分消费+用户端页面）** | 🆕 当前分支 |
+
+---
+
 ## 十、数据模型关系图
 
 ```
