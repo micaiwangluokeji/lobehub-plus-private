@@ -26,6 +26,8 @@ export const PERMISSION_ACTIONS = {
 
   GROUP_UPDATE: 'group:update',
 
+  GROUP_FORK: 'group:fork',
+
   GROUP_PUBLISH: 'group:publish',
 
   // ==================== Billing & Credits Management ====================
@@ -549,6 +551,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<SystemDefaultRoleName, readonly str
     `${action('GROUP_READ')}:all`,
     `${action('GROUP_UPDATE')}:owner`,
     `${action('GROUP_DELETE')}:owner`,
+    `${action('GROUP_FORK')}:owner`,
     `${action('GROUP_PUBLISH')}:owner`,
     // Session
     `${action('SESSION_READ')}:all`,
@@ -623,6 +626,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<SystemDefaultRoleName, readonly str
     `${action('GROUP_READ')}:all`,
     `${action('GROUP_UPDATE')}:owner`,
     `${action('GROUP_DELETE')}:owner`,
+    `${action('GROUP_FORK')}:owner`,
     `${action('GROUP_PUBLISH')}:owner`,
     `${action('SESSION_READ')}:all`,
     `${action('SESSION_CREATE')}:owner`,
