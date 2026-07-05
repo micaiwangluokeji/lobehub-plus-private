@@ -1,0 +1,22 @@
+- [x] super_admin 可以发布非自己创建的群组到发现页
+- [x] super_admin 可以发布非自己创建的智能体到发现页
+- [x] VIP 用户只能发布自己创建的群组/智能体
+- [x] VIP 用户发布时进入 `pending_review` 审核状态，不直接出现在发现页
+- [x] super_admin 发布时直接发布到发现页，无需审核
+- [x] super admin 审核页面显示待审核列表（agent 和 group）
+- [x] super admin 可以批准审核请求，批准后出现在发现页
+- [x] super admin 可以拒绝审核请求，拒绝后不出现在发现页
+- [x] 发现页 Agent 详情页不显示系统提示词
+- [x] 发现页 Agent 详情页显示概览（摘要、开场白、示例对话）
+- [x] 发现页 Agent 详情页样式与社区页一致
+- [x] 发现页 Group 详情页不显示成员系统提示词
+- [x] 发现页 Group 详情页显示概览和成员列表
+- [x] 发现页 Group 详情页样式与社区页一致
+- [x] Agent 编辑页：super_admin 显示「发布/更新到发现页」按钮
+- [x] Agent 编辑页：VIP 显示「提交审核」按钮
+- [x] Group 编辑页：super_admin 显示「发布/更新到发现页」按钮
+- [x] Group 编辑页：VIP 显示「提交审核」按钮
+- [x] pending_review 状态时显示"等待审核"标签
+- [x] 审核管理页面仅 super_admin 可访问
+- [x] 非管理员访问审核页面被重定向
+- [x] 类型检查通过（`bun run type-check`）

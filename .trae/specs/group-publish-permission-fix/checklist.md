@@ -1,0 +1,9 @@
+- [x] 前端权限 action 已修正为 `publish_group`
+- [x] `rbac_permissions` 表包含 `group:publish:all` 权限记录
+- [x] `rbac_permissions` 表包含 `group:publish:owner` 权限记录
+- [x] `super_admin` 角色关联 `group:publish:all` 权限（166 permissions）
+- [x] `vip_user` 角色关联 `group:publish:owner` 权限（48 permissions）
+- [ ] 管理员登录后群组配置页显示发布按钮
+- [ ] 点击发布按钮成功发布群组
+- [ ] 已发布群组显示更新和取消发布按钮
+- [ ] VIP 用户登录后显示提交审核按钮

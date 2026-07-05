@@ -1,0 +1,3 @@
+-- This migration was generated to drop FK constraints from spend_logs,
+-- but the constraints were removed from the schema before this migration was applied.
+-- Keeping this file empty to avoid migration errors.
