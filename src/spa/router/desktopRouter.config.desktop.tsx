@@ -716,6 +716,13 @@ export const desktopRoutes: RouteObject[] = [
           },
           {
             element: dynamicElement(
+              () => import('@/routes/(main)/admin/roles/[id]'),
+              'Desktop > Admin > Role Detail',
+            ),
+            path: 'roles/:id',
+          },
+          {
+            element: dynamicElement(
               () => import('@/routes/(main)/admin/permissions'),
               'Desktop > Admin > Permissions',
             ),
@@ -825,6 +832,20 @@ export const desktopRoutes: RouteObject[] = [
               'Desktop > Admin > Dict Configs',
             ),
             path: 'dict-configs',
+          },
+          {
+            element: dynamicElement(
+              () => import('@/routes/(main)/admin/orders'),
+              'Desktop > Admin > Orders',
+            ),
+            path: 'orders',
+          },
+          {
+            element: dynamicElement(
+              () => import('@/routes/(main)/admin/refund-requests'),
+              'Desktop > Admin > Refund Requests',
+            ),
+            path: 'refund-requests',
           },
         ],
         element: dynamicElement(

@@ -77,6 +77,10 @@ const AdminSidebar = memo(() => {
       { icon: TrendingUp, label: t('nav.subscriptions'), path: '/admin/subscriptions' },
       { icon: CreditCard, label: t('nav.creditTransactions'), path: '/admin/credit-transactions' },
       { icon: DollarSign, label: t('nav.spend'), path: '/admin/spend' },
+      { type: 'divider' },
+      { type: 'group' as const },
+      { icon: CreditCard, label: t('nav.orders'), path: '/admin/orders' },
+      { icon: DollarSign, label: t('nav.refundRequests'), path: '/admin/refund-requests' },
     ],
     [t],
   );
