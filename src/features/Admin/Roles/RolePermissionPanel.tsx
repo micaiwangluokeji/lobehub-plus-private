@@ -41,7 +41,7 @@ const RolePermissionPanel = memo<RolePermissionPanelProps>(({ open, onClose, onS
       setGrantedIds(new Set());
       setPage(0);
       Promise.all([
-        adminPermissionService.list({ page: 1, pageSize: 200 }),
+        adminPermissionService.list({ page: 1, pageSize: 500 }),
         adminRoleService.getPermissions(roleId),
       ])
         .then(([permRes, rolePermRes]) => {
