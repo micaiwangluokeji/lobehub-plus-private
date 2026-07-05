@@ -812,6 +812,13 @@ export const desktopRoutes: RouteObject[] = [
             ),
             path: 'plans',
           },
+          {
+            element: dynamicElement(
+              () => import('@/routes/(main)/admin/dict-configs'),
+              'Desktop > Admin > Dict Configs',
+            ),
+            path: 'dict-configs',
+          },
         ],
         element: dynamicElement(
           () => import('@/routes/(main)/admin/_layout'),
