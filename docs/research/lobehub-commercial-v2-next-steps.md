@@ -282,17 +282,72 @@ await db.transaction(async (tx) => {
 | 7 | 邀请好友页面 | 1.5h | P1 |
 | 8 | 支付流程 Modal（PlanSelector→QRCode→Status） | 2h | P1 |
 | 9 | 用量统计 + 订单历史页面 | 1.5h | P2 |
-| 10 | 微信支付 SDK 接入（统一下单 + 回调） | 4h | P0 |
-| 11 | 定时任务（降级/关单/过期） | 2h | P1 |
-| 12 | 管理员权限保护 | 1h | P1 |
-| 13 | E2E 测试 | 3h | P2 |
-| **总计** | | **25h** | |
+| 10 | **计费页面移动端适配** | 2h | P1 |
+| 11 | **iframe 降级策略（desktop保留iframe + Web原生）** | 30 min | P1 |
+| 12 | **Admin Dashboard 商业化卡片（今日收入/活跃订阅/新用户/积分消耗）** | 1.5h | P1 |
+| 13 | 微信支付 SDK 接入（统一下单 + 回调） | 4h | P0 |
+| 14 | 定时任务（降级/关单/过期） | 2h | P1 |
+| 15 | 管理员权限保护 | 1h | P1 |
+| 16 | E2E 测试 | 3h | P2 |
+| **总计** | | **29h** | |
 
 ---
 
-## 九、待讨论事项
+## 九、待讨论事项 → 已确认
 
-1. **移动端适配** — 计费页面是否需要移动端专属布局？
-2. **iframe 降级策略** — 桌面端是否保留 iframe fallback？
-3. **数据看板** — Admin Dashboard 是否需要新增商业化数据（今日收入、新订阅数等）？
-4. **邮件通知** — 订阅到期提醒是否需要对接邮件发送服务？
+| # | 事项 | 决策 | 并入步骤 |
+|---|------|------|---------|
+| 1 | 移动端适配 | **需要**：计费页面专属移动端布局 | 步骤 3-9 |
+| 2 | iframe 降级策略 | **保留**：桌面端 Electron 保留 iframe fallback，Web 端用原生 | 步骤 3-9 |
+| 3 | 数据看板 | **需要**：Admin Dashboard 新增商业化卡片 | 新增步骤 14 |
+
+---
+
+## 十、新增任务
+
+### 10.1 Admin Dashboard 商业化卡片（1.5h）
+
+**文件**：`src/features/Admin/Dashboard/index.tsx`（修改）
+
+新增 4 个统计卡片：
+
+| 卡片 | 数据源 | 说明 |
+|------|--------|------|
+| 今日收入 | `payment_orders SUM(amount) WHERE paid_at = today` | 微信+支付宝合计 |
+| 活跃订阅 | `subscriptions COUNT(*) WHERE status = 'active'` | 当前有效订阅数 |
+| 新注册用户 | `users COUNT(*) WHERE created_at = today` | 今日新增 |
+| 积分消耗 | `credit_transactions SUM(ABS(amount)) WHERE type='consumption' AND today` | 今日消耗积分 |
+
+### 10.2 计费页面移动端适配（2h）
+
+在 `src/routes/(mobile)/` 下新增计费相关路由：
+```
+src/routes/(mobile)/
+└── settings/
+    └── billing/
+        ├── index.tsx          # 移动端计费中心
+        ├── plans.tsx          # 移动端套餐对比
+        └── credits.tsx        # 移动端积分中心
+```
+
+**移动端布局特点**：
+- 套餐卡片纵向堆叠（非横向排列）
+- 功能对比表折叠为 Accordion
+- 支付 Modal 全屏
+- 积分余额展示大字体居中
+- 交易记录列表单列布局
+
+### 10.3 iframe 降级策略实现（30min）
+
+```typescript
+// src/business/client/BusinessSettingPages/Billing.tsx
+const Billing = memo(() => {
+  const Component = isDesktop
+    ? SubscriptionIframeWrapper  // Electron 桌面端保留 iframe
+    : BillingCenter;              // Web 端用原生组件
+
+  return <Component page="billing" />;
+});
+```
+
+同理处理 Credits / Plans / Usage / Referral 页面。
