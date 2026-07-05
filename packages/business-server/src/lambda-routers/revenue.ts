@@ -1,18 +1,17 @@
 import { and, count, eq, gte, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
-import { authedProcedure, router } from '@/libs/trpc/lambda';
-import { serverDatabase } from '@/libs/trpc/lambda/middleware';
+import { router } from '@/libs/trpc/lambda';
 import { SubscriptionsModel } from '@/database/models/subscriptions';
 import { CreditTransactionsModel } from '@/database/models/creditTransactions';
 import { SpendLogsModel } from '@/database/models/spendLogs';
 import { subscriptions } from '@/database/schemas/subscriptions';
 import { creditTransactions } from '@/database/schemas/creditTransactions';
 import { spendLogs } from '@/database/schemas/spendLogs';
+import { adminGuardProcedure } from '@/business/server/trpc-middlewares/adminGuard';
 
-const adminProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
+const adminProcedure = adminGuardProcedure.use(async (opts) => {
   const { ctx } = opts;
-  // TODO: add super admin check
   return opts.next({
     ctx: {
       subscriptionsModel: new SubscriptionsModel(ctx.serverDB),
