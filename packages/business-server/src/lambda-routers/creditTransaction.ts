@@ -1,10 +1,20 @@
 import { z } from 'zod';
 
-import { router } from '@/libs/trpc/lambda';
+import { authedProcedure, router } from '@/libs/trpc/lambda';
+import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { CreditTransactionsModel } from '@/database/models/creditTransactions';
 import { adminGuardProcedure } from '@/business/server/trpc-middlewares/adminGuard';
 
 const adminProcedure = adminGuardProcedure.use(async (opts) => {
+  const { ctx } = opts;
+  return opts.next({
+    ctx: {
+      creditTransactionsModel: new CreditTransactionsModel(ctx.serverDB),
+    },
+  });
+});
+
+const userProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
   return opts.next({
     ctx: {
@@ -107,10 +117,7 @@ export const creditTransactionRouter = router({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      // Get current balance
       const currentBalance = await ctx.creditTransactionsModel.getUserBalance(input.userId);
-
-      // Create adjustment record
       return ctx.creditTransactionsModel.create({
         userId: input.userId,
         type: 'adjustment',
@@ -119,5 +126,16 @@ export const creditTransactionRouter = router({
         description: input.reason,
         source: 'admin_adjust',
       });
+    }),
+
+  // ── User-facing endpoints ─────────────────────────
+  getMyBalance: userProcedure.query(async ({ ctx }) => {
+    return ctx.creditTransactionsModel.getUserBalance(ctx.userId!);
+  }),
+
+  listMyHistory: userProcedure
+    .input(z.object({ page: z.number().default(1), pageSize: z.number().default(20) }))
+    .query(async ({ input, ctx }) => {
+      return ctx.creditTransactionsModel.list({ userId: ctx.userId!, page: input.page, pageSize: input.pageSize });
     }),
 });
