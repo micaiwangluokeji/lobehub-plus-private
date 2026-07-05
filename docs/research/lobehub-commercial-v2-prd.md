@@ -1333,6 +1333,215 @@ src/locales/default/
 
 ---
 
+## 十四、源码全面审查结果（2026-07-05）
+
+> 对前端、后端、Admin 管理面板、数据库四层进行完整审查，识别遗漏。
+
+### 14.1 Admin 管理面板 — 状态总结
+
+管理面板 **27 个路由页面**，商业化相关 10 个模块**全部已完成**：
+
+| 模块 | 状态 | 组件 |
+|------|------|------|
+| 支付配置 | ✅ | `PaymentSettings.tsx` |
+| 套餐/积分管理 | ✅ | `PlanList.tsx`（含套餐 CRUD + 积分配置 Tab） |
+| 支付订单 | ✅ | `OrderList.tsx` |
+| 退款审核 | ✅ | `RefundRequestList.tsx` |
+| 订阅管理 | ✅ | `SubscriptionList.tsx` |
+| 积分交易 | ✅ | `CreditTransactionList.tsx` |
+| 消费记录 | ✅ | `SpendList.tsx` |
+| 收入仪表盘 | ✅ | `RevenueDashboard.tsx` |
+| 会员等级 | ✅ | `MembershipLevelList.tsx` |
+| 字典配置 | ✅ | `DictConfigList.tsx` |
+
+**Admin 面板缺口**：无。（AdminsiSidebar 已包含所有模块入口）
+
+---
+
+### 14.2 后端 — 关键遗漏（8 项高优先级）
+
+#### ① RBAC 中间件完全未集成 ⚠️ P0
+
+**现象**：`rbacPermission.ts` 完整实现了 `withRbacPermission`/`withAnyRbacPermission`/`withAllRbacPermissions`/`withScopedPermission` 四个中间件，但**所有 24 个业务路由器没有一个使用它们**。全部只用了 `authedProcedure`（仅检查登录）。
+
+```typescript
+// 当前：所有 admin 路由都这样
+adminProcedure = authedProcedure.use(serverDatabase)  // 无权限检查！
+
+// 多处有 // TODO: add super admin check 注释但从未实现
+// creditTransaction.ts, subscription.ts, spend.ts, contentModeration.ts,
+// systemHealth.ts, revenue.ts 共 6 个文件
+```
+
+**影响**：任何登录用户理论上都能调用 admin API（虽然后端 `buildWorkspaceWhere` 的数据隔离提供了一定保护）。
+
+#### ② 模型运行时钩子完全空壳 ⚠️ P0
+
+```typescript
+// packages/business-server/src/model-runtime.ts
+export function getBusinessModelRuntimeHooks(...): ModelRuntimeHooks | undefined {
+  return undefined;  // ← 积分检查、消费记录、内容审核全都没有
+}
+```
+
+**影响**：AI 调用时不会检查积分余额、不会记录消费日志、不会执行任何限制。
+
+#### ③ 业务服务层完全缺失
+
+`packages/business-server/src/services/` 目录**不存在**。不存在 `CreditService`/`SubscriptionService`/`PaymentService`/`BillingService`。
+
+#### ④ 8 个 Stub 路由器
+
+| 路由器 | 状态 | 需要 |
+|--------|------|------|
+| `referral.ts` | `router({})` | 邀请码生成/查询/推荐记录 |
+| `accountDeletion.ts` | `router({})` | 账号注销 |
+| `storageOverage.ts` | `router({})` | 存储超额处理 |
+| `workspaceCredits.ts` | `router({})` | workspace 积分 |
+| `workspaceCreds.ts` | `router({})` | workspace 凭证 |
+| `workspaceData.ts` | `router({})` | workspace 数据 |
+| `workspaceUsage.ts` | `router({})` | workspace 用量 |
+| `pageShare.ts` | 半空壳（返回 null/NOT_FOUND） | 页面分享 |
+
+#### ⑤ 缺少公开端点
+
+| 端点 | 当前 | 需要 |
+|------|------|------|
+| `plan.listPlans` | admin 权限 | **公开端点**（用户浏览套餐） |
+| `plan.getCreditConfig` | admin 权限 | **公开端点**（用户查看充值规则） |
+| `subscription.getMySubscription` | 不存在 | **用户查看自己订阅** |
+| `creditTransaction.getMyBalance` | 不存在 | **用户查看自己积分余额** |
+| `creditTransaction.listMyHistory` | 不存在 | **用户查看自己交易记录** |
+| `spend.listMySpend` | 不存在 | **用户查看自己消费统计** |
+| `topUp.paymentCallback` | 不存在 | **支付回调处理** |
+
+#### ⑥ `user.ts` 业务函数全部空壳
+
+```typescript
+getSubscriptionPlan()      → Plans.Free（硬编码，不查数据库）
+getReferralStatus()        → undefined
+initNewUserForBusiness()   → 空函数
+onUserActivityForBusiness() → 空函数
+```
+
+#### ⑦ 订阅状态变更无审计日志
+
+`subscription.ts` 的创建/取消/续订操作没有触发审计日志。
+
+#### ⑧ 支付回调/退款 API 集成未完成
+
+`topUp.ts` 无 `paymentCallback` 端点；`refundRequest.review` 有 TODO 注释"需集成微信退款 API"。
+
+---
+
+### 14.3 前端 — 关键遗漏（6 项高优先级）
+
+#### ① 无用户端计费服务 ⚠️ P0
+
+所有计费相关服务都是 admin-only：
+
+| 服务 | 文件 | 用户可用？ |
+|------|------|-----------|
+| `AdminCreditTransactionService` | `src/services/admin/credit-transactions.ts` | ❌ admin REST API |
+| `AdminSpendService` | `src/services/admin/spend.ts` | ❌ admin REST API |
+| `AdminPlanService` | `src/services/admin/plans.ts` | ❌ tRPC admin only |
+| `AdminMembershipLevelService` | `src/services/admin/membershipLevel.ts` | ❌ tRPC admin only |
+| `AdminSubscriptionService` | `src/services/admin/subscriptions.ts` | ❌ admin REST API |
+| `AdminPaymentService` | `src/services/admin/payment.ts` | ❌ tRPC admin only |
+
+**缺失的用户端服务**：`creditService.getBalance()`, `planService.listPlans()`, `subscriptionService.getCurrent()`, `referralService.getStats()`, `spendService.getMyStats()`
+
+#### ② 无计费 SWR 键
+
+`src/libs/swr/keys.ts` 中完全没有 `credits:`/`plans:`/`membership:`/`referral:` 域。需要新增。
+
+#### ③ 计费路由未注册
+
+`settings/billing` 及其子路由（`/plans`, `/credits`, `/usage`, `/referral`, `/history`）在两个 `desktopRouter.config` 中**完全不存在**。
+
+#### ④ 用户端计费页面全部 iframe/null
+
+```typescript
+// src/business/client/BusinessSettingPages/
+Billing.tsx   → iframe 嵌入（仅 desktop/Electron）
+Credits.tsx   → iframe 嵌入（仅 desktop/Electron）  
+Plans.tsx     → iframe 嵌入（仅 desktop/Electron）
+Usage.tsx     → iframe 嵌入（仅 desktop/Electron）
+Referral.tsx  → iframe 嵌入（仅 desktop/Electron）
+// Web 端全部返回 null
+```
+
+**缺失**：原生 React 组件（按 PRD 第六节设计）。
+
+#### ⑤ `ProGate`/`UpgradeModal` 组件不存在
+
+需要新建 `src/features/ProGate/` 目录。
+
+#### ⑥ `usePermission` 仅定义 7 个 action
+
+当前 `ACTION_PERMISSION_MAP`:
+```
+create_content, edit_own_content, manage_settings, manage_provider_key,
+manage_official_agents, publish_agent, publish_group
+```
+
+**缺失**：需要新增 `subscribe_plan`, `manage_billing`, `view_usage` 等。
+
+---
+
+### 14.4 数据库 — 关键遗漏（4 项）
+
+#### ① `credit_configs` 缺少 `defaultRegistrationCredits` 字段
+
+当前字段：`pricePerCredit`, `minTopUpAmount`, `maxTopUpAmount`, `bonusRate`, `creditExpiryDays`, `referralRewardCredits`
+
+**需要新增**：`defaultRegistrationCredits` (integer, default 0) — admin 配置注册赠积分
+
+#### ② 新 Schema 未从 barrel 导出
+
+`packages/database/src/schemas/index.ts` 缺少 `membershipLevels`, `paymentOrders`, `refundRequests`, `dictConfigs` 的导出。
+
+#### ③ 无 `invite_codes` 表
+
+邀请系统需要独立的邀请码表：
+```sql
+invite_codes (id, userId, code UNIQUE, status, usedByUserId, usedAt, timestamps)
+```
+
+#### ④ `payment_orders.expired_at` 缺少索引
+
+支付超时关单定时任务需要高效查询过期订单，当前无索引。
+
+---
+
+### 14.5 汇总：新增开发任务
+
+| # | 遗漏项 | 严重度 | 并入阶段 |
+|---|--------|--------|---------|
+| 37 | `credit_configs` 新增 `defaultRegistrationCredits` 字段 + Migration | P0 | 阶段 3️⃣ |
+| 38 | 新 Schema barrel 导出修复 | P1 | 阶段 0️⃣ |
+| 39 | 新增 `invite_codes` 表 Schema + Model | P0 | 阶段 3️⃣ |
+| 40 | `payment_orders.expired_at` 索引 | P2 | 阶段 4️⃣ |
+| 41 | RBAC 中间件集成到全部 admin 路由器 | P0 | 阶段 1️⃣ |
+| 42 | `plan.listPlans` + `getCreditConfig` 公开端点 | P0 | 阶段 5️⃣ |
+| 43 | `subscription.getMySubscription` 用户端点 | P0 | 阶段 5️⃣ |
+| 44 | `creditTransaction.getMyBalance` + `listMyHistory` 用户端点 | P0 | 阶段 2️⃣ |
+| 45 | `spend.listMySpend` 用户端点 | P1 | 阶段 5️⃣ |
+| 46 | `topUp.paymentCallback` 端点 | P0 | 阶段 4️⃣ |
+| 47 | 实现 `getBusinessModelRuntimeHooks` | P0 | 阶段 2️⃣ |
+| 48 | 实现 `initNewUserForBusiness` | P0 | 阶段 3️⃣ |
+| 49 | 实现 `getSubscriptionPlan` 真实查询 | P0 | 阶段 4️⃣ |
+| 50 | 实现 `getReferralStatus` | P1 | 阶段 3️⃣ |
+| 51 | 用户端计费服务（credit/plan/subscription/referral/spend） | P0 | 阶段 5️⃣ |
+| 52 | SWR 键（credits/plans/membership/referral） | P0 | 阶段 5️⃣ |
+| 53 | 计费路由注册（两个 desktopRouter config） | P0 | 阶段 5️⃣ |
+| 54 | `usePermission` 新增 billing action | P1 | 阶段 1️⃣ |
+| 55 | `rbac.ts` 新增 `PERMISSION_ACTIONS` 计费相关权限码 | P0 | 阶段 1️⃣ |
+| 56 | 新增 `MembershipService` 统一升级/降级逻辑 | P0 | 阶段 4️⃣ |
+| 57 | 无 `services/` 目录，新建业务服务层 | P1 | 阶段 2️⃣-4️⃣ |
+
+---
+
 ## 十、数据模型关系图
 
 ```
