@@ -18,6 +18,14 @@ export const PERMISSION_ACTIONS = {
   AGENT_UPDATE: 'agent:update',
 
   // ==================== Group Management ====================
+  GROUP_CREATE: 'group:create',
+
+  GROUP_DELETE: 'group:delete',
+
+  GROUP_READ: 'group:read',
+
+  GROUP_UPDATE: 'group:update',
+
   GROUP_PUBLISH: 'group:publish',
 
   // ==================== Billing & Credits Management ====================
@@ -536,6 +544,11 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<SystemDefaultRoleName, readonly str
     `${action('AGENT_FORK')}:all`,
     `${action('AGENT_PUBLISH')}:owner`,
     // Group — publish own
+    // Group — full CRUD + publish own
+    `${action('GROUP_CREATE')}:owner`,
+    `${action('GROUP_READ')}:all`,
+    `${action('GROUP_UPDATE')}:owner`,
+    `${action('GROUP_DELETE')}:owner`,
     `${action('GROUP_PUBLISH')}:owner`,
     // Session
     `${action('SESSION_READ')}:all`,
@@ -606,6 +619,10 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<SystemDefaultRoleName, readonly str
     `${action('AGENT_DELETE')}:owner`,
     `${action('AGENT_FORK')}:all`,
     `${action('AGENT_PUBLISH')}:owner`,
+    `${action('GROUP_CREATE')}:owner`,
+    `${action('GROUP_READ')}:all`,
+    `${action('GROUP_UPDATE')}:owner`,
+    `${action('GROUP_DELETE')}:owner`,
     `${action('GROUP_PUBLISH')}:owner`,
     `${action('SESSION_READ')}:all`,
     `${action('SESSION_CREATE')}:owner`,

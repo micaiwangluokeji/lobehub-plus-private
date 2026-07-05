@@ -1,9 +1,10 @@
 'use client';
 
-import { Checkbox, Modal, Space, Spin, message } from 'antd';
+import { Button, Checkbox, Modal, Space, Spin, message } from 'antd';
 import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { lambdaClient } from '@/libs/trpc/client';
 import type { PermissionInfo } from '@/services/admin/roles';
 import { adminRoleService } from '@/services/admin/roles';
 import { adminPermissionService } from '@/services/admin/permissions';
@@ -21,6 +22,17 @@ const RolePermissionPanel = memo<RolePermissionPanelProps>(({ open, onClose, onS
   const [grantedIds, setGrantedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      await lambdaClient.rbacSync.syncPermissions.mutate();
+      message.success('权限已同步，请重新打开弹窗查看');
+      onClose();
+    } catch { message.error('同步失败'); }
+    finally { setSyncing(false); }
+  };
 
   useEffect(() => {
     if (open) {
@@ -116,8 +128,12 @@ const RolePermissionPanel = memo<RolePermissionPanelProps>(({ open, onClose, onS
   return (
     <Modal
       confirmLoading={saving}
+      footer={[
+        <Button key="sync" loading={syncing} onClick={handleSync}>🔄 同步权限</Button>,
+        <Button key="cancel" onClick={onClose}>{t('actions.cancel')}</Button>,
+        <Button key="ok" loading={saving} onClick={handleSave} type="primary">{t('actions.save')}</Button>,
+      ]}
       onCancel={onClose}
-      onOk={handleSave}
       open={open}
       title={t('roles.permissionConfig')}
       width={600}

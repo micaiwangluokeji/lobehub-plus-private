@@ -1,10 +1,11 @@
 'use client';
 
-import { Button, Modal, Popconfirm, Space, Tag, message } from 'antd';
+import { Button, Form, Input, Modal, Popconfirm, Space, Tag, message } from 'antd';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AdminSearch, AdminTable, PageHeader, StatusTag } from '@/features/Admin/common';
+import { lambdaClient } from '@/libs/trpc/client';
 
 import type { AdminWorkspaceInfo } from '@/services/admin/workspaces';
 import { adminWorkspaceService } from '@/services/admin/workspaces';
@@ -24,6 +25,9 @@ const WorkspaceList = memo(() => {
   const [freezeModalOpen, setFreezeModalOpen] = useState(false);
   const [freezingWorkspace, setFreezingWorkspace] = useState<AdminWorkspaceInfo | null>(null);
   const [freezeReason, setFreezeReason] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [form] = Form.useForm();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -103,9 +107,33 @@ const WorkspaceList = memo(() => {
     [fetchData, t],
   );
 
+  const handleCreate = useCallback(async () => {
+    setCreateLoading(true);
+    try {
+      const values = await form.validateFields();
+      await (lambdaClient.workspace as any).create.mutate({
+        name: values.name,
+        slug: values.slug || values.name.toLowerCase().replace(/\s+/g, '-'),
+      });
+      message.success(t('actions.create') + ' ' + t('actions.confirm'));
+      setCreateOpen(false);
+      form.resetFields();
+      fetchData();
+    } catch {}
+    finally { setCreateLoading(false); }
+  }, [fetchData, form, t]);
+
   return (
     <div style={{ padding: 24 }}>
-      <PageHeader subtitle="" title={t('workspaces.title')} />
+      <PageHeader
+        actions={
+          <Button onClick={() => { setCreateOpen(true); form.resetFields(); }} type="primary">
+            {t('workspaces.create')}
+          </Button>
+        }
+        subtitle=""
+        title={t('workspaces.title')}
+      />
       <div style={{ marginBottom: 16 }}>
         <AdminSearch onSearch={handleSearch} placeholder={t('workspaces.searchPlaceholder')} />
       </div>
@@ -215,6 +243,24 @@ const WorkspaceList = memo(() => {
             style={{ width: '100%', padding: '6px 12px', border: '1px solid var(--ant-color-border)', borderRadius: 6 }}
             value={freezeReason}
           />
+        </Modal>
+      )}
+      {createOpen && (
+        <Modal
+          confirmLoading={createLoading}
+          onCancel={() => { setCreateOpen(false); form.resetFields(); }}
+          onOk={handleCreate}
+          open={createOpen}
+          title={t('workspaces.create')}
+        >
+          <Form form={form} layout="vertical">
+            <Form.Item label={t('workspaces.columns.name')} name="name" rules={[{ required: true }]}>
+              <Input placeholder="输入工作区名称" />
+            </Form.Item>
+            <Form.Item label={t('workspaces.columns.slug')} name="slug">
+              <Input placeholder="自动生成或手动输入" />
+            </Form.Item>
+          </Form>
         </Modal>
       )}
     </div>
