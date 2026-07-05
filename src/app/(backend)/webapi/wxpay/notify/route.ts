@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-import { serverDB } from '@/database/server/db';
+import { serverDB } from '@/database/server';
 import { PaymentOrdersModel } from '@/database/models/paymentOrders';
 import { CreditTransactionsModel } from '@/database/models/creditTransactions';
 

@@ -1,4 +1,4 @@
-import { lambdaClient } from '@/libs/trpc/lambda/client';
+import { lambdaClient } from '@/libs/trpc/client';
 
 export const creditService = {
   getMyBalance: () => lambdaClient.creditTransaction.getMyBalance.query(),

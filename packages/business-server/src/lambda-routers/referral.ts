@@ -1,5 +1,4 @@
-import { z } from 'zod';
-import { createId } from '@paralleldrive/cuid2';
+import crypto from 'crypto';
 
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
@@ -22,9 +21,9 @@ export const referralRouter = router({
     const active = existing.find((c) => c.status === 'active');
     if (active) return active;
 
-    const code = createId().slice(0, 8).toUpperCase();
+    const code = crypto.randomBytes(4).toString('hex').toUpperCase();
     return ctx.inviteCodesModel.create({
-      id: createId(),
+      id: crypto.randomUUID(),
       userId: ctx.userId!,
       code,
       status: 'active',

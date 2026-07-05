@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { router } from '@/libs/trpc/lambda';
+import { authedProcedure, router } from '@/libs/trpc/lambda';
+import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { MembershipLevelsModel } from '@/database/models/membershipLevels';
 import { adminGuardProcedure } from '@/business/server/trpc-middlewares/adminGuard';
 

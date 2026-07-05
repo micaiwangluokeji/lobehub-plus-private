@@ -19,8 +19,9 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   `,
 }));
 
-const ROLE_TAG_COLOR: Record<'super_admin' | 'vip_user' | 'free_user', string> = {
+const ROLE_TAG_COLOR: Record<'super_admin' | 'pro_user' | 'vip_user' | 'free_user', string> = {
   free_user: 'default',
+  pro_user: 'cyan',
   super_admin: 'gold',
   vip_user: 'purple',
 };
