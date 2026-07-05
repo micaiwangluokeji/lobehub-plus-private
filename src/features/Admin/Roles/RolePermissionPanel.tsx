@@ -184,7 +184,8 @@ const RolePermissionPanel = memo<RolePermissionPanelProps>(({ open, onClose, onS
                 </div>
               ))}
             </div>
-          ))
+          ))}
+          </>
         )}
       </div>
     </Modal>
