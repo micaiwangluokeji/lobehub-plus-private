@@ -44,6 +44,7 @@ const updateCreditConfigSchema = z.object({
   bonusRate: z.number().min(0).max(100).optional(),
   creditExpiryDays: z.number().int().min(0).optional(),
   referralRewardCredits: z.number().int().min(0).optional(),
+  defaultRegistrationCredits: z.number().int().min(0).optional(),
 });
 
 export const planRouter = router({

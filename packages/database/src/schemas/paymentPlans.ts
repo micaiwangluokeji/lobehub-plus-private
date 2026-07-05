@@ -74,6 +74,7 @@ export const creditConfigs = pgTable('credit_configs', {
   bonusRate: numeric('bonus_rate', { mode: 'number', precision: 5, scale: 2 }).default(0),
   creditExpiryDays: integer('credit_expiry_days').default(365),
   referralRewardCredits: integer('referral_reward_credits').default(0),
+  defaultRegistrationCredits: integer('default_registration_credits').default(500),
 
   ...timestamps,
 });
