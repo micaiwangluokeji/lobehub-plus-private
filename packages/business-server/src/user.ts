@@ -19,8 +19,19 @@ export async function getReferralStatus(userId: string): Promise<ReferralStatusS
   return undefined;
 }
 
-export async function getSubscriptionPlan(userId: string): Promise<Plans> {
-  return Plans.Free;
+export async function getSubscriptionPlan(
+  userId: string,
+  db?: LobeChatDatabase,
+): Promise<Plans> {
+  if (!db) return Plans.Free;
+
+  try {
+    const subsModel = new SubscriptionsModel(db);
+    const active = await subsModel.getActiveSubscription(userId);
+    return active ? Plans.Premium : Plans.Free;
+  } catch {
+    return Plans.Free;
+  }
 }
 
 /**
