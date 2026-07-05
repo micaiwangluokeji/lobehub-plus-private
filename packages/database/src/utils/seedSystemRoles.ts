@@ -79,13 +79,17 @@ const upsertSystemRole = async (
 
 export interface SeededSystemRoles {
   freeUserRoleId: string;
+  proUserRoleId: string;
   superAdminRoleId: string;
   vipUserRoleId: string;
 }
 
 /**
- * Idempotently provision the three global system roles (`super_admin`,
- * `vip_user`, `free_user`) plus all permissions they depend on.
+ * Idempotently provision the four global system roles (`super_admin`,
+ * `pro_user`, `vip_user`, `free_user`) plus all permissions they depend on.
+ *
+ * `vip_user` is retained for backward compatibility but `pro_user` is the
+ * recommended paid-user role going forward.
  *
  * Safe to call:
  * - On system bootstrap (first run after migration)
@@ -105,6 +109,11 @@ export const seedSystemRoles = async (
     SYSTEM_DEFAULT_ROLES.SUPER_ADMIN,
     permissionIdByCode,
   );
+  const proUserRoleId = await upsertSystemRole(
+    db,
+    SYSTEM_DEFAULT_ROLES.PRO_USER,
+    permissionIdByCode,
+  );
   const vipUserRoleId = await upsertSystemRole(
     db,
     SYSTEM_DEFAULT_ROLES.VIP_USER,
@@ -116,12 +125,12 @@ export const seedSystemRoles = async (
     permissionIdByCode,
   );
 
-  return { freeUserRoleId, superAdminRoleId, vipUserRoleId };
+  return { freeUserRoleId, proUserRoleId, superAdminRoleId, vipUserRoleId };
 };
 
 /**
- * Grant `userId` a named global system role (`super_admin` | `vip_user` |
- * `free_user`). Idempotent — re-grants are no-ops thanks to the
+ * Grant `userId` a named global system role (`super_admin` | `pro_user` |
+ * `vip_user` | `free_user`). Idempotent — re-grants are no-ops thanks to the
  * `(user_id, role_id, workspace_id)` unique index (NULL workspace collapses
  * into the `''` bucket).
  */

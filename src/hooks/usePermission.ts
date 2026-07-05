@@ -35,10 +35,15 @@ const ACTION_PERMISSION_MAP: Record<string, string[]> = {
   manage_provider_key: [],
   // Publishing / unpublishing official agents — requires agent:update:all (super_admin only)
   manage_official_agents: ['agent:update:all'],
-  // Publishing agents to discover page — admin (all) or VIP (owner only)
+  // Publishing agents to discover page — admin (all) or Pro/VIP (owner only)
   publish_agent: ['agent:update:all', 'agent:publish:owner'],
-  // Publishing groups to discover page — admin (all) or VIP (owner only)
+  // Publishing groups to discover page — admin (all) or Pro/VIP (owner only)
   publish_group: ['group:publish:all', 'group:publish:owner'],
+  // Billing & subscription management
+  subscribe_plan: ['billing:read:all', 'billing:read:owner'],
+  view_usage: ['billing:read:all', 'billing:read:owner'],
+  manage_provider: ['ai_provider:create:all', 'ai_provider:create:owner'],
+  manage_referral: ['referral:read:all', 'referral:read:owner'],
 };
 
 export const usePermission = (action: string): Permission => {
