@@ -17,6 +17,7 @@ import {
   Server,
   Settings,
   Shield,
+  Star,
   TrendingUp,
   Users,
 } from 'lucide-react';
@@ -64,6 +65,7 @@ const AdminSidebar = memo(() => {
       { icon: Settings, label: t('nav.settings'), path: '/admin/settings' },
       { type: 'divider' },
       { type: 'group' as const },
+      { icon: Star, label: t('nav.membership'), path: '/admin/membership' },
       { icon: ListTree, label: t('nav.dictConfigs'), path: '/admin/dict-configs' },
       { type: 'divider' },
       { type: 'group' as const },
@@ -131,6 +133,7 @@ const AdminSidebar = memo(() => {
             '/admin/audit-logs',
             '/admin/settings',
             '/admin/dict-configs',
+            '/admin/membership',
             '/admin/payment',
             '/admin/plans',
           ].includes(item.path!);

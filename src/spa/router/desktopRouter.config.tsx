@@ -930,6 +930,13 @@ export const desktopRoutes: RouteObject[] = [
           },
           {
             element: dynamicElement(
+              () => import('@/routes/(main)/admin/membership'),
+              'Desktop > Admin > Membership',
+            ),
+            path: 'membership',
+          },
+          {
+            element: dynamicElement(
               () => import('@/routes/(main)/admin/dict-configs'),
               'Desktop > Admin > Dict Configs',
             ),

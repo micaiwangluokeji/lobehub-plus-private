@@ -14,6 +14,7 @@ import { planRouter } from '@/business/server/lambda-routers/plan';
 import { revenueRouter } from '@/business/server/lambda-routers/revenue';
 import { creditTransactionRouter } from '@/business/server/lambda-routers/creditTransaction';
 import { dictConfigRouter } from '@/business/server/lambda-routers/dictConfig';
+import { membershipLevelRouter } from '@/business/server/lambda-routers/membershipLevel';
 import { contentModerationRouter } from '@/business/server/lambda-routers/contentModeration';
 import { systemHealthRouter } from '@/business/server/lambda-routers/systemHealth';
 import { workspaceRouter } from '@/business/server/lambda-routers/workspace';
@@ -175,6 +176,7 @@ export const lambdaRouter = router({
   revenue: revenueRouter,
   creditTransaction: creditTransactionRouter,
   dictConfig: dictConfigRouter,
+  membershipLevel: membershipLevelRouter,
   contentModeration: contentModerationRouter,
   systemHealth: systemHealthRouter,
 });
