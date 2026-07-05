@@ -1,11 +1,14 @@
 'use client';
 
 import { Flexbox } from '@lobehub/ui';
+import { DollarSign, TrendingUp, UserPlus, Zap } from 'lucide-react';
 import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Users, Building2, Bot, MessageSquare, FileText, Server } from 'lucide-react';
+import useSWR from 'swr';
 
 import { adminDashboardService } from '@/services/admin/dashboard';
+import { adminRevenueService } from '@/services/admin/revenue';
 import type { DashboardStats } from '@/services/admin/dashboard';
 
 import StatCard from './StatCard';
@@ -26,6 +29,8 @@ const Dashboard = memo(() => {
   const [recentWorkspaces, setRecentWorkspaces] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const { data: revenueStats } = useSWR('admin:revenue:stats', adminRevenueService.getDashboardStats);
+
   useEffect(() => {
     setLoading(true);
     Promise.all([
@@ -43,6 +48,10 @@ const Dashboard = memo(() => {
   }, []);
 
   const statCards = [
+    { icon: <DollarSign size={24} />, key: 'revenue', label: '今日收入', value: `¥${revenueStats?.totalRevenue ?? 0}` },
+    { icon: <TrendingUp size={24} />, key: 'subscriptions', label: '活跃订阅', value: revenueStats?.activeSubscriptions ?? 0 },
+    { icon: <UserPlus size={24} />, key: 'newUsers', label: '今日新用户', value: revenueStats?.newUsersToday ?? 0 },
+    { icon: <Zap size={24} />, key: 'creditsUsed', label: '今日积分消耗', value: revenueStats?.creditsConsumedToday ?? 0 },
     { icon: <Users size={24} />, key: 'users', label: t('dashboard.stat.users'), value: stats.userCount },
     { icon: <Building2 size={24} />, key: 'workspaces', label: t('dashboard.stat.workspaces'), value: stats.workspaceCount },
     { icon: <Bot size={24} />, key: 'agents', label: t('dashboard.stat.agents'), value: stats.agentCount },
