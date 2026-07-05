@@ -1052,88 +1052,115 @@ useSWR(['credits.history', page, filter], () => creditService.getHistory(...))
 | 0.5 | Admin UI: 字典配置、会员等级、支付订单、退款审核、角色详情 | ✅ |
 | 0.6 | `users.membershipLevelId` 字段 | ✅ |
 | 0.7 | i18n 完整翻译 | ✅ |
+| 0.8 | 新 Schema barrel 导出（index.ts） | 待完成 |
 
-### 阶段 1️⃣：RBAC 权限重构（3-4 小时）
+### 阶段 1️⃣：RBAC 权限重构（4-5 小时）
 
 | # | 任务 | 文件 | 说明 |
 |---|------|------|------|
-| 1.1 | 修改 `free_user` 权限定义 | `packages/const/src/rbac.ts` | 补充 session/message/file/document/knowledge_base/ai_model 等基础权限（详见 2.2 节） |
-| 1.2 | **新建 `pro_user` 角色** | `packages/const/src/rbac.ts` | 继承 free_user 全部权限 + agent:create/fork/publish + ai_provider:create 等 |
+| 1.1 | 修改 `free_user` 权限定义 | `packages/const/src/rbac.ts` | 补充 session/message/file/document/knowledge_base/ai_model 等基础权限 |
+| 1.2 | **新建 `pro_user` 角色** | `packages/const/src/rbac.ts` | 继承 free_user 全部权限 + agent:create/fork/publish + ai_provider:create |
 | 1.3 | 更新系统角色种子 | `packages/database/src/utils/seedSystemRoles.ts` | 新增 `pro_user` 角色种子 |
-| 1.4 | 更新前端角色检测 | `src/hooks/useUserRoles.ts` | 新增 `isPro` 判断（优先级: super_admin > pro_user > free_user） |
-| 1.5 | 更新前端权限映射 | `src/hooks/usePermission.ts` | 补充 `subscribe_plan`、`publish_content` 等新 action |
+| 1.4 | 更新前端角色检测 | `src/hooks/useUserRoles.ts` | 新增 `isPro` 判断（priority: super_admin > pro_user > vip_user > free_user） |
+| 1.5 | 更新前端权限映射 | `src/hooks/usePermission.ts` | 补充 `subscribe_plan`、`view_usage` 等新 action |
 | 1.6 | 更新 Feature Flags | `packages/app-config/src/featureFlags/schema.ts` | 新增加 `nav_*_for_pro_user` 系列开关 |
-| 1.7 | 更新导航/侧边栏 Pro 标识 | `src/hooks/useNavLayout.ts`, AdminSidebar | Pro 功能菜单项显示 🔒 PRO badge，非隐藏 |
-| 1.8 | 新建 `<ProGate>` 组件 | `src/features/ProGate/index.tsx` | 统一 Pro-Gating 包裹组件：自动检测 isPro → 渲染 children 或锁定态 |
-| 1.9 | 新建 `<UpgradeModal>` 组件 | `src/features/ProGate/UpgradeModal.tsx` | 升级弹窗：根据 feature 显示对应文案 + 套餐选择 |
+| 1.7 | 更新导航/侧边栏 Pro 标识 | `src/hooks/useNavLayout.ts`, AdminSidebar | Pro 功能菜单项显示 🔒 PRO badge |
+| 1.8 | 新建 `<ProGate>` 组件 | `src/features/ProGate/index.tsx` | 统一 Pro-Gating 包裹组件 |
+| 1.9 | 新建 `<UpgradeModal>` 组件 | `src/features/ProGate/UpgradeModal.tsx` | 升级弹窗：选套餐 → 支付 |
 | 1.10 | 各场景接入 ProGate | 按钮/菜单/设置页面 | 详见 3.3 Pro-Gating 清单 |
-| 1.11 | 更新 i18n | `src/locales/default/admin.ts` + auth.ts | `pro_user` 角色名称、Pro 锁定提示文案、升级 Modal 文案 |
+| 1.11 | 更新 i18n | `src/locales/default/` | `pro_user` 角色名称、Pro 锁定提示、升级 Modal 文案 |
+| 1.12 | **RBAC 中间件集成到 admin 路由器** | 全部 `packages/business-server/src/lambda-routers/` | 替换 `adminProcedure` 为 `adminProcedure.use(withRbacPermission(...))`，补上 6 个 TODO |
+| 1.13 | `rbac.ts` 新增计费权限码 | `packages/const/src/rbac.ts` | 新增 `billing:read`, `subscription:manage` 等 |
+| 1.14 | 扩展 `enableBusinessFeatures` 到 Web 端 | 环境变量/feature flag | 非 desktop 环境也能启用 |
 
-> **校验标准**：运行 `bun run type-check` 零错误；lint 零错误；`free_user` 能创建 session/发消息/上传文件；`pro_user` 能创建 agent
+> **校验标准**：`type-check` 零错误；`free_user` 能聊天；`pro_user` 能创建 agent；admin API 有 RBAC 保护
 
-### 阶段 2️⃣：积分消费逻辑（4-5 小时）
+### 阶段 2️⃣：积分消费逻辑（5-6 小时）
 
 | # | 任务 | 文件 | 说明 |
 |---|------|------|------|
-| 2.1 | 新增 `creditBalanceCheck` 中间件 | `packages/business-server/src/trpc-middlewares/creditBalance.ts` | 在 AI 调用类 API 前检查积分余额，不足则返回 402 |
-| 2.2 | 实现 AI 调用积分扣减 | `packages/business-server/src/model-runtime.ts` | 在 `getBusinessModelRuntimeHooks` 中实现 `beforeInvoke`（余额检查）和 `afterInvoke`（积分扣减 + spend_log） |
-| 2.3 | 实现图片生成积分扣减 | `packages/business-server/src/image-generation/` | 填充 `chargeBeforeGenerate`（余额检查）和 `chargeAfterGenerate`（扣减积分） |
+| 2.1 | 新增 `creditBalanceCheck` 中间件 | `packages/business-server/src/trpc-middlewares/creditBalance.ts` | AI 调用前检查积分余额 + 预算上限；不足返回 402；悲观锁防并发 |
+| 2.2 | 实现 `getBusinessModelRuntimeHooks` | `packages/business-server/src/model-runtime.ts` | `beforeInvoke` 余额检查+预扣；`afterInvoke` 结算扣减+spend_log |
+| 2.3 | 实现图片生成积分扣减 | `packages/business-server/src/image-generation/` | 填充 `chargeBeforeGenerate` / `chargeAfterGenerate` |
 | 2.4 | 实现视频生成积分扣减 | `packages/business-server/src/video-generation/` | 同上 |
-| 2.5 | 积分汇率计算工具 | `packages/business-server/src/utils/creditPricing.ts` | `calculateCreditsByTokens(promptTokens, completionTokens, modelId)` 按模型定价计算消耗积分 |
-| 2.6 | 前端积分余额展示 | `src/features/` 公共组件 | Header 显示余额 + 充值入口；余额不足 banner 提示 |
-| 2.7 | 前端积分消费确认 | 聊天输入框等 | 余额检查：≤ 0 时禁用发送按钮，引导充值 |
-| 2.8 | Admin 积分汇率配置 | `src/features/Admin/Plans/PlanList.tsx` | 新增模型级积分定价配置（已有 `pricePerCredit`，可扩展） |
+| 2.5 | 积分汇率计算工具 | `packages/business-server/src/utils/creditPricing.ts` | `calculateCreditsByTokens(…)` 按模型定价 |
+| 2.6 | 前端积分余额展示 | `src/features/` 公共组件 | Header 余额 badge + 余额不足 banner |
+| 2.7 | 前端积分消费确认 | 聊天输入框等 | 余额 ≤ 0 禁用发送，引导充值 |
+| 2.8 | Admin 积分汇率配置 | `src/features/Admin/Plans/PlanList.tsx` | 已有 `pricePerCredit`，确认可配置 |
+| 2.9 | **用户积分端点** | `creditTransaction.ts` | 新增 `getMyBalance`、`listMyHistory`（公开） |
+| 2.10 | **流式对话中断处理** | `model-runtime.ts` + 前端 | 余额中途归零 → 中断流式返回 + toast 提示 |
 
-> **校验标准**：Free 用户发消息 → 积分减少 → spend_log 记录完整；余额为 0 → 返回 402 + 前端禁用输入
+> **校验标准**：发消息 → 积分减少 → spend_log 完整；余额 0 → 402 + 前端禁用；并发消费不透支
 
-### 阶段 3️⃣：注册赠送 + 邀请系统（3-4 小时）
+### 阶段 3️⃣：注册赠送 + 邀请系统（4-5 小时）
 
 | # | 任务 | 文件 | 说明 |
 |---|------|------|------|
-| 3.1 | `credit_configs` 新增 `defaultRegistrationCredits` | Schema + Migration + Admin UI | admin 配置注册赠送积分数 |
-| 3.2 | 实现 `initNewUserForBusiness` | `packages/business-server/src/user.ts` | 注册时写入 bonus credit_transactions；处理 inviteCode |
-| 3.3 | 新增 `invite_codes` 表 | Schema + Model | id, userId, code, status, usedByUserId, usedAt |
+| 3.1 | `credit_configs` 新增 `defaultRegistrationCredits` 字段 | Schema + Migration + Admin UI | admin 配置注册赠积分 |
+| 3.2 | 实现 `initNewUserForBusiness` | `packages/business-server/src/user.ts` | 注册赠积分 + 处理 inviteCode → 双方奖励 |
+| 3.3 | 新增 `invite_codes` 表 | Schema + Model + Migration | id, userId, code UNIQUE, status, usedByUserId, usedAt |
 | 3.4 | 填充 `referralRouter` | `packages/business-server/src/lambda-routers/referral.ts` | generateInviteCode, getMyReferrals, getReferralStats |
-| 3.5 | 修改注册流程支持 inviteCode | `apps/server/src/services/user/index.ts` | 在 initUser 中传递 inviteCode 给 initNewUserForBusiness |
-| 3.6 | 前端邀请页面（原生） | `src/features/Referral/` | 替换 iframe：展示邀请码、邀请链接、推荐记录、累计收益 |
-| 3.7 | Admin 邀请奖励配置 | `src/features/Admin/Plans/PlanList.tsx` | `referralRewardCredits` 已有，确认配置可用 |
+| 3.5 | 修改注册流程支持 inviteCode | `apps/server/src/services/user/index.ts` | 传递 inviteCode 给 initNewUserForBusiness |
+| 3.6 | 实现 `getReferralStatus` | `packages/business-server/src/user.ts` | 替换 stub，返回推荐状态 |
+| 3.7 | 前端邀请页面（原生） | `src/features/Referral/` | 邀请码/链接/战绩/记录，替换 iframe |
+| 3.8 | Admin 邀请奖励配置 | `src/features/Admin/Plans/PlanList.tsx` | `referralRewardCredits` 已有，确认可用 |
 
-> **校验标准**：用户 A 生成邀请码 → B 用码注册 → 双方各获得 admin 配置的积分 → 推荐记录可查
+> **校验标准**：A 生成邀请码 → B 用码注册 → 双方各得积分 → 推荐记录可查
 
-### 阶段 4️⃣：订阅 → Pro 升级桥接（3-4 小时）
+### 阶段 4️⃣：订阅 → Pro 升级桥接（4-5 小时）
 
 | # | 任务 | 文件 | 说明 |
 |---|------|------|------|
 | 4.1 | 实现 `getSubscriptionPlan` | `packages/business-server/src/user.ts` | 替换 stub，真正查询 subscriptions 表 |
-| 4.2 | 新增 `MembershipService` | `packages/business-server/src/services/membership.ts` | 统一升级/降级逻辑：calculateLevel → updateMembership → assignRole |
-| 4.3 | 支付回调中集成升级逻辑 | `src/app/(backend)/webapi/wxpay/notify/route.ts` | 支付成功 → 积分入账 → 检查升级 → 分配 pro_user 角色 |
-| 4.4 | 定时降级任务 | `apps/server/src/app/(backend)/trpc/...` 或 cron | 每日检查过期订阅 → 降级 → 移除 pro_user 角色 |
-| 4.5 | Pro 到期提醒 | 通知系统 | 到期前 7 天/3 天/1 天发送站内信 + 邮件 |
-| 4.6 | 前端 Pro 状态展示 | `src/features/` | Profile 页面展示会员等级 + 到期时间 + 续费按钮 |
+| 4.2 | 新增 `MembershipService` | `packages/business-server/src/services/membership.ts` | calculateLevel → updateMembership → assignRole 统一逻辑 |
+| 4.3 | 支付回调集成升级逻辑 | `src/app/(backend)/webapi/wxpay/notify/route.ts` | 支付成功 → 积分入账 → 升级检查 → 分配 pro_user |
+| 4.4 | 支付回调幂等性 | `wxpay/notify/route.ts` | 已支付订单忽略重复回调 |
+| 4.5 | 新增 `topUp.paymentCallback` 端点 | `topUp.ts` | 支付结果回写 + 积分入账 |
+| 4.6 | 定时降级任务 | cron route handler | 每日检查过期订阅 → 降级 → 移除 pro_user |
+| 4.7 | 支付超时关单 | cron job | `payment_orders WHERE expired_at < NOW()` → `expired` |
+| 4.8 | 积分过期定时任务 | cron job | `creditExpiryDays` 到期积分清理 + 提醒 |
+| 4.9 | Pro 降级 Agent 保留策略 | membership.ts | 不删除 agent；不能新建；已发布保持 |
+| 4.10 | Pro 到期提醒 | 通知系统 | 到期前 7/3/1 天站内信 + 邮件 |
+| 4.11 | 订阅成功/降级通知 | 通知系统 | 站内信通知 |
+| 4.12 | 前端 Pro 状态展示 | `src/features/` | Profile 展示等级 + 到期 + 续费按钮 |
 
-> **校验标准**：用户订阅套餐 → 自动成为 pro_user → 可创建 agent；到期 → 自动降级为 free_user
+> **校验标准**：订阅 → pro_user + 可创建 agent；到期 → free_user；降级不删 agent
 
-### 阶段 5️⃣：用户端原生页面（3-4 小时）
+### 阶段 5️⃣：用户端原生页面（5-6 小时）
 
 | # | 任务 | 文件 | 说明 |
 |---|------|------|------|
-| 5.1 | 原生支付页面 | `src/features/TopUp/` | PlanSelector + PaymentQRCode + OrderStatus，替换 SubscriptionIframeWrapper |
-| 5.2 | 原生积分页面 | `src/features/Credits/` | 积分余额 + 交易记录列表 + 充值入口 |
-| 5.3 | 原生套餐页面 | `src/features/Plans/` | 套餐对比 + 订阅按钮 |
-| 5.4 | 原生邀请页面 | `src/features/Referral/` | 邀请码/链接 + 推荐记录 |
-| 5.5 | 计费设置路由 | `src/routes/(main)/settings/billing/` | 整合所有计费子页面 |
+| 5.1 | **用户端计费服务创建** | `src/services/billing/` | `creditService`(getBalance/history), `planService`(listPlans), `subscriptionService`(getCurrent), `referralService`(getStats/generateCode) |
+| 5.2 | **SWR 键注册** | `src/libs/swr/keys.ts` | 新增 `credits`, `plans`, `membership`, `referral` 域 |
+| 5.3 | **计费路由注册** | 两个 `desktopRouter.config` | `settings/billing` 及其子路由 |
+| 5.4 | 原生支付流程 | `src/features/Billing/Payment/` | PlanSelector → PaymentQRCode → OrderStatus |
+| 5.5 | 原生积分页面 | `src/features/Billing/Credits/` | 余额展示 + 快速充值 + 交易记录 |
+| 5.6 | 原生套餐页面 | `src/features/Billing/PlanComparison/` | 套餐对比 + 功能表 + 订阅按钮 |
+| 5.7 | 原生邀请页面 | `src/features/Billing/Referral/` | 邀请码/链接 + 战绩 + 记录 |
+| 5.8 | 计费中心总览 | `src/features/Billing/BillingCenter.tsx` | 套餐状态 + 余额 + 快捷入口 |
+| 5.9 | 订单历史 | `src/features/Billing/OrderHistory.tsx` | 订单列表 + 退款入口 |
+| 5.10 | 用量统计 | `src/features/Billing/Usage/` | Token 趋势图 + 模型分布 |
+| 5.11 | **公开端点创建** | `plan.ts`, `subscription.ts`, `spend.ts` | listPlans(public), getMySubscription, listMySpend |
+| 5.12 | 加载/错误/空状态 | 各页面 | Skeleton/ErrorBoundary/EmptyState |
+| 5.13 | 移动端适配 | 各页面 | 卡片堆叠、Accordion、全屏 Modal |
+| 5.14 | i18n `billing.ts` | `src/locales/default/billing.ts` | 全部计费页面翻译键 |
 
-> **校验标准**：Web 端非 desktop 也能看到原生页面（不再返回 null）；桌面端保留 iframe 作为 fallback
+> **校验标准**：Web 端原生可用；非 desktop 环境显示；桌面端保留 iframe fallback
 
 ### 阶段 6️⃣：集成测试与清理（2-3 小时）
 
 | # | 任务 | 说明 |
 |---|------|------|
-| 6.1 | 端到端测试：注册 → 聊天消耗积分 → 充值 → 升级 Pro → 创建 agent | 完整用户旅程验证 |
-| 6.2 | 权限穿透测试：Free 调 Pro API → 403 / Pro 调 Admin API → 403 | 确保后端权限中间件覆盖所有新增 API |
-| 6.3 | 积分边界测试：余额 0 → 余额负 → 并发消费 | 防止积分透支 |
-| 6.4 | 清理旧代码：移除 `vip_user` 角色引用、清理未使用的 stub | 保持代码整洁 |
-| 6.5 | 更新 PRD + README | 文档同步 |
+| 6.1 | 端到端测试 | 注册 → 聊天消耗积分 → 余额不足 → 充值 → 升级 Pro → 创建 agent → 发布审核 |
+| 6.2 | 权限穿透测试 | Free 调 Pro API → 403；Pro 调 Admin API → 403（确保 RBAC 中间件覆盖） |
+| 6.3 | 积分边界测试 | 余额 0 / 负 / 并发消费 → 不透支 |
+| 6.4 | 支付流程测试 | 下单 → 支付 → 回调 → 积分入账 → 升级 |
+| 6.5 | 降级流程测试 | 订阅到期 → 定时降级 → agent 保留 |
+| 6.6 | 邀请测试 | 生成邀请码 → 注册 → 双方积分 |
+| 6.7 | 清理：移除 `vip_user` 引用 | 旧代码清理（保留角色定义，向前兼容） |
+| 6.8 | 更新 PRD + README | 文档同步 |
+
+> **总计**：6 阶段，**57 个任务**，预估 **23-31 小时**
 
 ---
 
