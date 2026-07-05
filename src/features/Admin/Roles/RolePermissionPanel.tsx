@@ -39,6 +39,7 @@ const RolePermissionPanel = memo<RolePermissionPanelProps>(({ open, onClose, onS
       setLoading(true);
       setAllPermissions([]);
       setGrantedIds(new Set());
+      setPage(0);
       Promise.all([
         adminPermissionService.list({ page: 1, pageSize: 200 }),
         adminRoleService.getPermissions(roleId),
@@ -125,6 +126,12 @@ const RolePermissionPanel = memo<RolePermissionPanelProps>(({ open, onClose, onS
     {} as Record<string, PermissionInfo[]>,
   );
 
+  const categoryEntries = Object.entries(groupedPermissions);
+  const [page, setPage] = useState(0);
+  const pageSize = 3; // categories per page
+  const totalPages = Math.ceil(categoryEntries.length / pageSize);
+  const pagedCategories = categoryEntries.slice(page * pageSize, (page + 1) * pageSize);
+
   return (
     <Modal
       confirmLoading={saving}
@@ -148,14 +155,22 @@ const RolePermissionPanel = memo<RolePermissionPanelProps>(({ open, onClose, onS
             {t('permissions.empty')}
           </div>
         ) : (
-          Object.entries(groupedPermissions).map(([category, perms]) => (
-            <div key={category} style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--ant-color-text-secondary)' }}>
-                {category}
+          <>
+            {totalPages > 1 && (
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 12 }}>
+                <Button disabled={page === 0} onClick={() => setPage(p => p - 1)} size="small">上一页</Button>
+                <span style={{ lineHeight: '24px', fontSize: 13 }}>{page + 1} / {totalPages}</span>
+                <Button disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} size="small">下一页</Button>
               </div>
-              {perms.map((perm) => (
-                <div key={perm.id} style={{ marginBottom: 4 }}>
-                  <Checkbox
+            )}
+            {pagedCategories.map(([category, perms]) => (
+              <div key={category} style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--ant-color-text-secondary)' }}>
+                  {category}
+                </div>
+                {perms.map((perm) => (
+                  <div key={perm.id} style={{ marginBottom: 4 }}>
+                    <Checkbox
                     checked={grantedIds.has(perm.id)}
                     onChange={(e) => handleToggle(perm.id, e.target.checked)}
                   >
