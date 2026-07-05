@@ -110,14 +110,14 @@ const PermissionList = memo(() => {
   );
 
   // Extract unique categories from data for filter
-  const categories = [...new Set(data.map((p) => p.category))].filter(Boolean);
+  const categories = [...new Set(data.map((p) => p.category).filter(Boolean))].sort();
 
   const [syncing, setSyncing] = useState(false);
   const handleSync = async () => {
     setSyncing(true);
     try {
       const result = await lambdaClient.rbacSync.syncPermissions.mutate();
-      message.success(`同步完成：新增 ${result.results[1]} 个权限`);
+      message.success(`同步完成：${result.results.join(' | ')}`);
       fetchData(1, pageSize, keyword, category);
     } catch {
       message.error('同步失败');
@@ -128,11 +128,14 @@ const PermissionList = memo(() => {
 
   return (
     <div style={{ padding: 24 }}>
-      <PageHeader title={t('permissions.title')}>
-        <Button loading={syncing} onClick={handleSync} type="primary">
-          🔄 同步权限
-        </Button>
-      </PageHeader>
+      <PageHeader
+        actions={
+          <Button loading={syncing} onClick={handleSync} type="primary">
+            🔄 同步权限
+          </Button>
+        }
+        title={t('permissions.title')}
+      />
       <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
         <AdminSearch onSearch={handleSearch} placeholder={t('actions.search')} />
         <Select
