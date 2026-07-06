@@ -38,7 +38,7 @@ const ContentModerationList = memo(() => {
     setLoading(true);
     try {
       const data = await adminContentModerationService.list(filters);
-      setLogs(data.data);
+      setLogs(data?.data ?? []);
     } catch {
       message.error(t('contentModeration.fetchFailed' as any));
     } finally {

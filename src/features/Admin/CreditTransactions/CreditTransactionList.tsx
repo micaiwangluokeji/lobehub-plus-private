@@ -37,7 +37,7 @@ const CreditTransactionList = memo(() => {
     setLoading(true);
     try {
       const data = await adminCreditTransactionService.list(filters);
-      setTransactions(data.data);
+      setTransactions(data?.data ?? []);
     } catch {
       message.error(t('creditTransactions.fetchFailed'));
     } finally {

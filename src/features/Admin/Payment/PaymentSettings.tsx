@@ -66,6 +66,31 @@ const PaymentSettings = memo(() => {
           <Form.Item name={['wechat', 'apiCert']} label={t('payment.wechatApiCert')}>
             <Input.TextArea rows={3} placeholder={t('payment.wechatApiCertPlaceholder')} />
           </Form.Item>
+          <Form.Item name={['wechat', 'payVersion']} label={t('payment.wechatPayVersion')}>
+            <Select
+              options={[
+                { label: t('payment.wechatPayVersionV2'), value: 'V2' },
+                { label: t('payment.wechatPayVersionV3'), value: 'V3' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item name={['wechat', 'merchantType']} label={t('payment.wechatMerchantType')}>
+            <Select
+              options={[
+                { label: t('payment.wechatMerchantTypeOrdinary'), value: 'ordinary' },
+                { label: t('payment.wechatMerchantTypeService'), value: 'service_provider' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item name={['wechat', 'paySignKey']} label={t('payment.wechatPaySignKey')}>
+            <Input.Password placeholder={t('payment.wechatPaySignKeyPlaceholder')} />
+          </Form.Item>
+          <Form.Item name={['wechat', 'payAuthDir']} label={t('payment.wechatPayAuthDir')}>
+            <Input placeholder={t('payment.wechatPayAuthDirPlaceholder')} />
+          </Form.Item>
+          <Form.Item name={['wechat', 'logo']} label={t('payment.wechatLogo')}>
+            <Input placeholder={t('payment.wechatLogoPlaceholder')} />
+          </Form.Item>
         </Card>
 
         {/* Alipay Card */}
@@ -92,6 +117,9 @@ const PaymentSettings = memo(() => {
                 { label: t('payment.alipayGatewaySandbox'), value: 'sandbox' },
               ]}
             />
+          </Form.Item>
+          <Form.Item name={['alipay', 'logo']} label={t('payment.alipayLogo')}>
+            <Input placeholder={t('payment.alipayLogoPlaceholder')} />
           </Form.Item>
         </Card>
 

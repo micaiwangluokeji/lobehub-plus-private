@@ -1,7 +1,7 @@
 'use client';
 
 import type { UpdateSystemConfigParams } from '@/services/admin/settings';
-import { Button, InputNumber, message } from 'antd';
+import { Button, Card, Form, Input, InputNumber, message, Select, Switch, Tabs } from 'antd';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -11,15 +11,13 @@ import { adminSettingsService } from '@/services/admin/settings';
 
 const SystemSettings = memo(() => {
   const { t } = useTranslation('admin');
+  const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
-  const [systemName, setSystemName] = useState('');
-  const [defaultLanguage, setDefaultLanguage] = useState('');
-  const [registrationEnabled, setRegistrationEnabled] = useState(true);
-  const [maxFileUploadSize, setMaxFileUploadSize] = useState(50);
-  const [logRetentionDays, setLogRetentionDays] = useState(90);
+  const [loading, setLoading] = useState(false);
   const [defaultAgentConfig, setDefaultAgentConfig] = useState<Record<string, unknown> | null>(null);
 
   const fetchConfig = useCallback(async () => {
+    setLoading(true);
     try {
       const [globalRes, agentRes] = await Promise.allSettled([
         adminSettingsService.getGlobalConfig(),
@@ -27,18 +25,21 @@ const SystemSettings = memo(() => {
       ]);
       if (globalRes.status === 'fulfilled') {
         const config = globalRes.value as unknown as Record<string, unknown>;
-        if (config.systemName) setSystemName(String(config.systemName));
-        if (config.defaultLanguage) setDefaultLanguage(String(config.defaultLanguage));
-        if (config.registrationEnabled !== undefined) setRegistrationEnabled(Boolean(config.registrationEnabled));
-        if (config.maxFileUploadSize) setMaxFileUploadSize(Number(config.maxFileUploadSize));
-        if (config.logRetentionDays) setLogRetentionDays(Number(config.logRetentionDays));
+        form.setFieldsValue({
+          defaultLanguage: config.defaultLanguage ?? '',
+          logRetentionDays: config.logRetentionDays ?? 90,
+          maxFileUploadSize: config.maxFileUploadSize ?? 50,
+          registrationEnabled: config.registrationEnabled !== false,
+          systemName: config.systemName ?? '',
+        });
       }
       if (agentRes.status === 'fulfilled') {
         const agentConfig = agentRes.value as unknown as Record<string, unknown>;
         if (Object.keys(agentConfig).length > 0) setDefaultAgentConfig(agentConfig);
       }
     } catch {}
-  }, []);
+    setLoading(false);
+  }, [form]);
 
   useEffect(() => {
     fetchConfig();
@@ -47,11 +48,12 @@ const SystemSettings = memo(() => {
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
+      const values = await form.validateFields();
       const params: UpdateSystemConfigParams = {
-        defaultLanguage,
-        maxFileUploadSize,
-        registrationEnabled,
-        systemName,
+        defaultLanguage: values.defaultLanguage,
+        maxFileUploadSize: values.maxFileUploadSize,
+        registrationEnabled: values.registrationEnabled,
+        systemName: values.systemName,
       };
       await adminSettingsService.updateSystemConfig(params);
       message.success(t('settings.saveSuccess'));
@@ -60,163 +62,125 @@ const SystemSettings = memo(() => {
     } finally {
       setSaving(false);
     }
-  }, [defaultLanguage, maxFileUploadSize, registrationEnabled, systemName, t]);
+  }, [form, t]);
+
+  const tabItems = [
+    {
+      children: (
+        <>
+          <Form.Item label={t('settings.systemName')} name="systemName">
+            <Input placeholder={t('settings.systemName')} />
+          </Form.Item>
+          <Form.Item label={t('settings.defaultLanguage')} name="defaultLanguage">
+            <Select
+              options={[
+                { label: '中文', value: 'zh-CN' },
+                { label: 'English', value: 'en-US' },
+                { label: '日本語', value: 'ja-JP' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item label={t('settings.systemLogo')} name="systemLogo">
+            <Input placeholder={t('settings.systemLogo')} />
+          </Form.Item>
+          <Form.Item label={t('settings.icp')} name="icp">
+            <Input placeholder={t('settings.icpPlaceholder')} />
+          </Form.Item>
+          <Form.Item label={t('settings.contactEmail')} name="contactEmail">
+            <Input placeholder={t('settings.contactEmailPlaceholder')} />
+          </Form.Item>
+        </>
+      ),
+      key: 'basic',
+      label: t('settings.tabBasic'),
+    },
+    {
+      children: (
+        <>
+          <Form.Item label={t('settings.registrationEnabled')} name="registrationEnabled" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item label={t('settings.defaultRole')} name="defaultRole">
+            <Input placeholder={t('settings.defaultRolePlaceholder')} />
+          </Form.Item>
+          <Form.Item label={t('settings.newUserCredits')} name="newUserCredits">
+            <InputNumber min={0} style={{ width: 200 }} />
+          </Form.Item>
+          <Form.Item label={t('settings.newUserCompute')} name="newUserCompute">
+            <InputNumber min={0} style={{ width: 200 }} />
+          </Form.Item>
+        </>
+      ),
+      key: 'registration',
+      label: t('settings.tabRegistration'),
+    },
+    {
+      children: (
+        <>
+          <Form.Item label={t('settings.maxFileUploadSize')} name="maxFileUploadSize">
+            <InputNumber min={1} style={{ width: 200 }} />
+          </Form.Item>
+          <Form.Item label={t('settings.logRetentionDays')} name="logRetentionDays">
+            <InputNumber min={1} style={{ width: 200 }} />
+          </Form.Item>
+        </>
+      ),
+      key: 'advanced',
+      label: t('settings.tabAdvanced'),
+    },
+    {
+      children: (
+        <>
+          <Form.Item label="SMTP Server" name="smtpServer">
+            <Input placeholder="smtp.example.com" />
+          </Form.Item>
+          <Form.Item label="SMTP Port" name="smtpPort">
+            <InputNumber min={1} max={65535} style={{ width: 200 }} />
+          </Form.Item>
+          <Form.Item label="SMTP Username" name="smtpUsername">
+            <Input />
+          </Form.Item>
+          <Form.Item label="SMTP Password" name="smtpPassword">
+            <Input.Password />
+          </Form.Item>
+          <Form.Item label="SMTP From" name="smtpFrom">
+            <Input placeholder="noreply@example.com" />
+          </Form.Item>
+        </>
+      ),
+      key: 'notification',
+      label: t('settings.tabNotification'),
+    },
+  ];
 
   return (
     <div style={{ padding: 24 }}>
       <PageHeader subtitle="" title={t('settings.title')} />
-      <div style={{ maxWidth: 640 }}>
-        {/* 基本信息 */}
-        <div
-          style={{
-            background: 'var(--ant-color-bg-container)',
-            borderRadius: 12,
-            border: '1px solid var(--ant-color-border-secondary)',
-            padding: 24,
-            marginBottom: 16,
-          }}
-        >
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4, color: 'var(--ant-color-text)' }}>
-            {t('settings.basicInfo')}
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--ant-color-text-quaternary)', marginBottom: 20 }}>
-            {t('settings.basicInfoDesc')}
-          </div>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--ant-color-text-secondary)' }}>
-              {t('settings.systemName')}
-            </div>
-            <input
-              onChange={(e) => setSystemName(e.target.value)}
-              style={{ width: '100%', padding: '6px 12px', border: '1px solid var(--ant-color-border)', borderRadius: 6 }}
-              value={systemName}
-            />
-          </div>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--ant-color-text-secondary)' }}>
-              {t('settings.defaultLanguage')}
-            </div>
-            <select
-              onChange={(e) => setDefaultLanguage(e.target.value)}
-              style={{ width: '100%', padding: '6px 12px', border: '1px solid var(--ant-color-border)', borderRadius: 6, height: 36 }}
-              value={defaultLanguage}
-            >
-              <option value="zh-CN">中文</option>
-              <option value="en-US">English</option>
-              <option value="ja-JP">日本語</option>
-            </select>
-          </div>
-        </div>
-
-        {/* 功能开关 */}
-        <div
-          style={{
-            background: 'var(--ant-color-bg-container)',
-            borderRadius: 12,
-            border: '1px solid var(--ant-color-border-secondary)',
-            padding: 24,
-            marginBottom: 16,
-          }}
-        >
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4, color: 'var(--ant-color-text)' }}>
-            {t('settings.featureToggles')}
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--ant-color-text-quaternary)', marginBottom: 20 }}>
-            {t('settings.featureTogglesDesc')}
-          </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <input
-              checked={registrationEnabled}
-              onChange={(e) => setRegistrationEnabled(e.target.checked)}
-              type="checkbox"
-              style={{ width: 16, height: 16 }}
-            />
-            <span style={{ fontSize: 14 }}>{t('settings.registrationEnabled')}</span>
-          </label>
-        </div>
-
-        {/* 高级配置 */}
-        <div
-          style={{
-            background: 'var(--ant-color-bg-container)',
-            borderRadius: 12,
-            border: '1px solid var(--ant-color-border-secondary)',
-            padding: 24,
-            marginBottom: 24,
-          }}
-        >
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4, color: 'var(--ant-color-text)' }}>
-            {t('settings.advanced')}
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--ant-color-text-quaternary)', marginBottom: 20 }}>
-            {t('settings.advancedDesc')}
-          </div>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--ant-color-text-secondary)' }}>
-              {t('settings.maxFileUploadSize')}
-            </div>
-            <InputNumber
-              min={1}
-              onChange={(val) => setMaxFileUploadSize(val || 50)}
-              style={{ width: 200 }}
-              value={maxFileUploadSize}
-            />
-          </div>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--ant-color-text-secondary)' }}>
-              {t('settings.logRetentionDays')}
-            </div>
-            <InputNumber
-              min={1}
-              onChange={(val) => setLogRetentionDays(val || 90)}
-              style={{ width: 200 }}
-              value={logRetentionDays}
-            />
-          </div>
-        </div>
-
+      <Card loading={loading} style={{ maxWidth: 720 }}>
+        <Form form={form} layout="vertical">
+          <Tabs items={tabItems} />
+        </Form>
         {/* 默认 Agent 配置（只读展示） */}
         {defaultAgentConfig && Object.keys(defaultAgentConfig).length > 0 && (
           <div
             style={{
-              background: 'var(--ant-color-bg-container)',
-              borderRadius: 12,
-              border: '1px solid var(--ant-color-border-secondary)',
-              padding: 24,
+              background: 'var(--ant-color-bg-layout)',
+              borderRadius: 6,
+              padding: 12,
               marginBottom: 16,
+              fontSize: 12,
+              maxHeight: 200,
+              overflow: 'auto',
             }}
           >
-            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4, color: 'var(--ant-color-text)' }}>
-              默认 Agent 配置
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--ant-color-text-quaternary)', marginBottom: 20 }}>
-              系统级默认 Agent 参数（通过环境变量 DEFAULT_AGENT_CONFIG 配置）
-            </div>
-            <pre
-              style={{
-                background: 'var(--ant-color-bg-layout)',
-                borderRadius: 6,
-                padding: 12,
-                fontSize: 12,
-                maxHeight: 300,
-                overflow: 'auto',
-                margin: 0,
-              }}
-            >
-              {JSON.stringify(defaultAgentConfig, null, 2)}
-            </pre>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>默认 Agent 配置</div>
+            <pre style={{ margin: 0, fontSize: 11 }}>{JSON.stringify(defaultAgentConfig, null, 2)}</pre>
           </div>
         )}
-
-        <Button
-          loading={saving}
-          onClick={handleSave}
-          size="large"
-          type="primary"
-        >
+        <Button loading={saving} onClick={handleSave} type="primary">
           {t('actions.save')}
         </Button>
-      </div>
+      </Card>
     </div>
   );
 });

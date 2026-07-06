@@ -847,6 +847,34 @@ export const desktopRoutes: RouteObject[] = [
             ),
             path: 'refund-requests',
           },
+          {
+            element: dynamicElement(
+              () => import('@/routes/(main)/admin/login-config'),
+              'Desktop > Admin > Login Config',
+            ),
+            path: 'login-config',
+          },
+          {
+            element: dynamicElement(
+              () => import('@/routes/(main)/admin/decoration'),
+              'Desktop > Admin > Decoration',
+            ),
+            path: 'decoration',
+          },
+          {
+            element: dynamicElement(
+              () => import('@/routes/(main)/admin/agreement'),
+              'Desktop > Admin > Agreement',
+            ),
+            path: 'agreement',
+          },
+          {
+            element: dynamicElement(
+              () => import('@/routes/(main)/admin/payment-sdk'),
+              'Desktop > Admin > Payment SDK',
+            ),
+            path: 'payment-sdk',
+          },
         ],
         element: dynamicElement(
           () => import('@/routes/(main)/admin/_layout'),
