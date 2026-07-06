@@ -36,8 +36,9 @@ const CreditTransactionList = memo(() => {
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await adminCreditTransactionService.list(filters);
-      setTransactions(data?.data ?? []);
+      const res = await adminCreditTransactionService.list(filters);
+      const body = res as unknown as { data: { data: CreditTransactionItem[] } };
+      setTransactions(body?.data?.data ?? []);
     } catch {
       message.error(t('creditTransactions.fetchFailed'));
     } finally {

@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Card, Form, Input, InputNumber, message, Select, Space, Switch } from 'antd';
+import { Button, Card, Descriptions, Form, Input, InputNumber, message, Select, Space, Switch, Tabs } from 'antd';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,6 +12,7 @@ const PaymentSettings = memo(() => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState('wechat');
 
   const fetchConfig = useCallback(async () => {
     setLoading(true);
@@ -42,12 +43,14 @@ const PaymentSettings = memo(() => {
     }
   }, [form, t]);
 
-  return (
-    <div>
-      <PageHeader title={t('payment.title')} />
-      <Form form={form} layout="vertical" style={{ maxWidth: 720 }}>
-        {/* WeChat Pay Card */}
-        <Card title={t('payment.wechat')} style={{ marginBottom: 16 }}>
+  const tabItems = [
+    {
+      children: (
+        <Card
+          style={{ marginTop: 12 }}
+          title={t('payment.wechat')}
+          type="inner"
+        >
           <p style={{ color: 'var(--ant-color-text-secondary)', marginBottom: 16, fontSize: 13 }}>
             {t('payment.wechatDesc')}
           </p>
@@ -92,9 +95,17 @@ const PaymentSettings = memo(() => {
             <Input placeholder={t('payment.wechatLogoPlaceholder')} />
           </Form.Item>
         </Card>
-
-        {/* Alipay Card */}
-        <Card title={t('payment.alipay')} style={{ marginBottom: 16 }}>
+      ),
+      key: 'wechat',
+      label: t('payment.wechat'),
+    },
+    {
+      children: (
+        <Card
+          style={{ marginTop: 12 }}
+          title={t('payment.alipay')}
+          type="inner"
+        >
           <p style={{ color: 'var(--ant-color-text-secondary)', marginBottom: 16, fontSize: 13 }}>
             {t('payment.alipayDesc')}
           </p>
@@ -122,9 +133,17 @@ const PaymentSettings = memo(() => {
             <Input placeholder={t('payment.alipayLogoPlaceholder')} />
           </Form.Item>
         </Card>
-
-        {/* General Settings Card */}
-        <Card title={t('payment.general')} style={{ marginBottom: 16 }}>
+      ),
+      key: 'alipay',
+      label: t('payment.alipay'),
+    },
+    {
+      children: (
+        <Card
+          style={{ marginTop: 12 }}
+          title={t('payment.general')}
+          type="inner"
+        >
           <p style={{ color: 'var(--ant-color-text-secondary)', marginBottom: 16, fontSize: 13 }}>
             {t('payment.generalDesc')}
           </p>
@@ -143,8 +162,62 @@ const PaymentSettings = memo(() => {
             <Input placeholder={t('payment.notifyUrlPlaceholder')} />
           </Form.Item>
         </Card>
+      ),
+      key: 'general',
+      label: t('payment.general'),
+    },
+    {
+      children: (
+        <Card
+          style={{ marginTop: 12 }}
+          title={t('paymentSdk.title')}
+          type="inner"
+        >
+          <Space direction="vertical" size={16} style={{ width: '100%', maxWidth: 640 }}>
+            <Card
+              extra={<Button size="small" type="default">{t('paymentSdk.installed')}</Button>}
+              size="small"
+              title={t('paymentSdk.wechatpay')}
+              type="inner"
+            >
+              <p style={{ color: 'var(--ant-color-text-secondary)', fontSize: 13, marginBottom: 16 }}>
+                {t('paymentSdk.wechatpayDesc')}
+              </p>
+              <Descriptions column={1} size="small">
+                <Descriptions.Item label="Package">wechatpay-node-v3</Descriptions.Item>
+                <Descriptions.Item label="Version">3.x</Descriptions.Item>
+                <Descriptions.Item label="Status">{'✅ ' + t('paymentSdk.installed')}</Descriptions.Item>
+              </Descriptions>
+            </Card>
+            <Card
+              extra={<Button size="small" type="primary">{t('paymentSdk.installNow')}</Button>}
+              size="small"
+              title={t('paymentSdk.alipay')}
+              type="inner"
+            >
+              <p style={{ color: 'var(--ant-color-text-secondary)', fontSize: 13, marginBottom: 16 }}>
+                {t('paymentSdk.alipayDesc')}
+              </p>
+              <Descriptions column={1} size="small">
+                <Descriptions.Item label="Package">alipay-sdk</Descriptions.Item>
+                <Descriptions.Item label="Version">3.x</Descriptions.Item>
+                <Descriptions.Item label="Status">{'❌ ' + t('paymentSdk.notInstalled')}</Descriptions.Item>
+              </Descriptions>
+            </Card>
+          </Space>
+        </Card>
+      ),
+      key: 'sdk',
+      label: t('paymentSdk.title')!,
+    },
+  ];
 
-        <Space>
+  return (
+    <div>
+      <PageHeader title={t('payment.title')} />
+      <Form form={form} layout="vertical" style={{ maxWidth: 720 }}>
+        <Tabs activeKey={activeTab} items={tabItems} onChange={setActiveTab} />
+        <Space style={{ marginTop: 16 }}>
           <Button type="primary" loading={saving} onClick={handleSave}>
             {t('actions.save')}
           </Button>

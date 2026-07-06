@@ -5,17 +5,7 @@ import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { PageHeader } from '@/features/Admin/common';
-
-export interface LoginConfig {
-  allowedLoginMethods: string[];
-  allowedRegisterMethods: string[];
-  defaultLoginMethod: string;
-  allowMultipleLogin: boolean;
-  showPolicyAgreement: boolean;
-  smsProvider?: string;
-  smsApiKey?: string;
-  smsSignName?: string;
-}
+import { adminLoginConfigService, type LoginConfig } from '@/services/admin/loginConfig';
 
 const defaultLoginConfig: LoginConfig = {
   allowedLoginMethods: ['account'],
@@ -34,13 +24,8 @@ const LoginConfigPage = memo(() => {
   const fetchConfig = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/v1/admin/login-config');
-      if (res.ok) {
-        const data = await res.json();
-        form.setFieldsValue({ ...defaultLoginConfig, ...data });
-      } else {
-        form.setFieldsValue(defaultLoginConfig);
-      }
+      const config = await adminLoginConfigService.getLoginConfig();
+      form.setFieldsValue(config);
     } catch {
       form.setFieldsValue(defaultLoginConfig);
     } finally {
@@ -56,11 +41,7 @@ const LoginConfigPage = memo(() => {
     setSaving(true);
     try {
       const values = await form.validateFields();
-      await fetch('/api/v1/admin/login-config', {
-        body: JSON.stringify(values),
-        headers: { 'Content-Type': 'application/json' },
-        method: 'PUT',
-      });
+      await adminLoginConfigService.updateLoginConfig(values);
       message.success(t('settings.saveSuccess'));
     } catch {
       message.error(t('settings.saveFailed'));

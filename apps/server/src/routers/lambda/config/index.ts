@@ -60,8 +60,8 @@ const getActiveBillboard = async (): Promise<GlobalBillboard | null> => {
   }
 };
 
-const NAV_ITEM_IDS = ['home', 'discover', 'tasks', 'pages', 'image', 'resource', 'memory'] as const;
-const NAV_ROLES = ['free_user', 'vip_user'] as const;
+const NAV_ITEM_IDS = ['home', 'discover', 'tasks', 'pages', 'image', 'resource', 'memory', 'community', 'settings', 'profile', 'appearance', 'provider', 'apikey', 'about', 'stats'] as const;
+const NAV_ROLES = ['free_user', 'pro_user', 'vip_user'] as const;
 
 const navVisibilitySchema = z.object(
   Object.fromEntries(
@@ -105,7 +105,10 @@ export const configRouter = router({
 
       const patch: Record<string, boolean> = {};
       for (const [key, value] of Object.entries(input)) {
-        patch[`nav_${key}`] = value;
+        // key = 'home_free_user' → flag: 'nav_home_for_free_user'
+        const [navId, ...roleParts] = key.split('_');
+        const role = roleParts.join('_'); // handles role names with underscores e.g. free_user
+        patch[`nav_${navId}_for_${role}`] = value;
       }
 
       await publishFeatureFlags(patch);

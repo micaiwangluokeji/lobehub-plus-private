@@ -84,7 +84,6 @@ const AdminSidebar = memo(() => {
       { icon: TrendingUp, label: t('nav.subscriptions'), path: '/admin/subscriptions' },
       { icon: CreditCard, label: t('nav.creditTransactions'), path: '/admin/credit-transactions' },
       { icon: DollarSign, label: t('nav.spend'), path: '/admin/spend' },
-      { icon: CreditCard, label: t('nav.paymentSdk'), path: '/admin/payment-sdk' },
 
       // 系统设置
       { type: 'divider' },

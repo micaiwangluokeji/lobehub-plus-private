@@ -863,17 +863,38 @@ export const desktopRoutes: RouteObject[] = [
           },
           {
             element: dynamicElement(
+              () => import('@/routes/(main)/admin/revenue'),
+              'Desktop > Admin > Revenue',
+            ),
+            path: 'revenue',
+          },
+          {
+            element: dynamicElement(
+              () => import('@/routes/(main)/admin/subscriptions'),
+              'Desktop > Admin > Subscriptions',
+            ),
+            path: 'subscriptions',
+          },
+          {
+            element: dynamicElement(
+              () => import('@/routes/(main)/admin/credit-transactions'),
+              'Desktop > Admin > Credit Transactions',
+            ),
+            path: 'credit-transactions',
+          },
+          {
+            element: dynamicElement(
+              () => import('@/routes/(main)/admin/spend'),
+              'Desktop > Admin > Spend',
+            ),
+            path: 'spend',
+          },
+          {
+            element: dynamicElement(
               () => import('@/routes/(main)/admin/agreement'),
               'Desktop > Admin > Agreement',
             ),
             path: 'agreement',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/payment-sdk'),
-              'Desktop > Admin > Payment SDK',
-            ),
-            path: 'payment-sdk',
           },
         ],
         element: dynamicElement(

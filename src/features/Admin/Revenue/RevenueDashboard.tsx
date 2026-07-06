@@ -18,14 +18,17 @@ const RevenueDashboard = () => {
   const fetchData = async (params?: { startDate?: string; endDate?: string }) => {
     setLoading(true);
     try {
-      const [statsData, subscriptionData, creditData] = await Promise.all([
+      const [statsRes, subscriptionRes, creditRes] = await Promise.all([
         adminRevenueService.getDashboardStats(params),
         adminRevenueService.getSubscriptionAnalytics(),
         adminRevenueService.getCreditAnalytics(),
       ]);
-      setStats(statsData);
-      setSubscriptionAnalytics(subscriptionData);
-      setCreditAnalytics(creditData);
+      const sBody = statsRes as unknown as { data: RevenueDashboardStats };
+      const subBody = subscriptionRes as unknown as { data: SubscriptionAnalytics };
+      const cBody = creditRes as unknown as { data: CreditAnalytics };
+      setStats(sBody?.data ?? null);
+      setSubscriptionAnalytics(subBody?.data ?? null);
+      setCreditAnalytics(cBody?.data ?? null);
     } catch (error) {
       console.error('Failed to fetch revenue data:', error);
     } finally {
