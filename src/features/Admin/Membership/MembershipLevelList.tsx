@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Input, InputNumber, message, Modal, Popconfirm, Switch, Table, Tag } from 'antd';
+import { Button, Input, InputNumber, message, Modal, Popconfirm, Select, Switch, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { Plus } from 'lucide-react';
 import { memo, useCallback, useEffect, useState } from 'react';
@@ -26,9 +26,16 @@ interface MembershipLevelRecord {
   color?: string | null;
   enabled: boolean;
   sort: number;
+  defaultRole?: string | null;
   createdAt: string;
   updatedAt: string;
 }
+
+const ROLE_OPTIONS = [
+  { value: 'free_user', label: 'free_user' },
+  { value: 'pro_user', label: 'pro_user' },
+  { value: 'vip_user', label: 'vip_user' },
+];
 
 const MembershipLevelList = memo(() => {
   const { t } = useTranslation('admin');
@@ -38,7 +45,6 @@ const MembershipLevelList = memo(() => {
   const [editingRecord, setEditingRecord] = useState<MembershipLevelRecord | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Form state
   const [formName, setFormName] = useState('');
   const [formSlug, setFormSlug] = useState('');
   const [formLevel, setFormLevel] = useState(0);
@@ -50,6 +56,7 @@ const MembershipLevelList = memo(() => {
   const [formColor, setFormColor] = useState('');
   const [formEnabled, setFormEnabled] = useState(true);
   const [formSort, setFormSort] = useState(0);
+  const [formDefaultRole, setFormDefaultRole] = useState('free_user');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -80,6 +87,7 @@ const MembershipLevelList = memo(() => {
     setFormColor('');
     setFormEnabled(true);
     setFormSort(0);
+    setFormDefaultRole('free_user');
     setModalOpen(true);
   }, []);
 
@@ -96,6 +104,7 @@ const MembershipLevelList = memo(() => {
     setFormColor(record.color || '');
     setFormEnabled(record.enabled);
     setFormSort(record.sort);
+    setFormDefaultRole(record.defaultRole || 'free_user');
     setModalOpen(true);
   }, []);
 
@@ -120,6 +129,7 @@ const MembershipLevelList = memo(() => {
           color: formColor || undefined,
           enabled: formEnabled,
           sort: formSort,
+          defaultRole: formDefaultRole,
         };
         await adminMembershipLevelService.update(params);
         message.success(t('membership.updateSuccess'));
@@ -136,6 +146,7 @@ const MembershipLevelList = memo(() => {
           color: formColor || undefined,
           enabled: formEnabled,
           sort: formSort,
+          defaultRole: formDefaultRole,
         };
         await adminMembershipLevelService.create(params);
         message.success(t('membership.createSuccess'));
@@ -147,7 +158,7 @@ const MembershipLevelList = memo(() => {
     } finally {
       setSaving(false);
     }
-  }, [editingRecord, formName, formSlug, formLevel, formMinRecharge, formCreditsBonus, formStorageBonus, formFeatures, formIcon, formColor, formEnabled, formSort, t, fetchData]);
+  }, [editingRecord, formName, formSlug, formLevel, formMinRecharge, formCreditsBonus, formStorageBonus, formFeatures, formIcon, formColor, formEnabled, formSort, formDefaultRole, t, fetchData]);
 
   const handleDelete = useCallback(
     async (id: string) => {
@@ -230,6 +241,13 @@ const MembershipLevelList = memo(() => {
       width: 80,
       render: (v: boolean) =>
         v ? <Tag color="green">{t('membership.enabled')}</Tag> : <Tag color="red">{t('membership.disabled')}</Tag>,
+    },
+    {
+      title: t('membership.columns.defaultRole'),
+      dataIndex: 'defaultRole',
+      key: 'defaultRole',
+      width: 100,
+      render: (v: string) => <Tag>{v || '-'}</Tag>,
     },
     {
       title: t('membership.columns.actions'),
@@ -392,6 +410,18 @@ const MembershipLevelList = memo(() => {
               value={formSort}
             />
           </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--ant-color-text-secondary)' }}>
+            {t('membership.form.defaultRole')}
+          </div>
+          <Select
+            onChange={setFormDefaultRole}
+            options={ROLE_OPTIONS}
+            style={{ width: '100%' }}
+            value={formDefaultRole}
+          />
         </div>
 
         <div style={{ marginBottom: 16 }}>

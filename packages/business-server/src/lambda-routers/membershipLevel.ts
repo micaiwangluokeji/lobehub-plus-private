@@ -26,6 +26,7 @@ const createMembershipLevelSchema = z.object({
   color: z.string().max(16).optional(),
   enabled: z.boolean().default(true),
   sort: z.number().int().default(0),
+  defaultRole: z.string().min(1).max(32).default('free_user'),
 });
 
 const updateMembershipLevelSchema = z.object({
@@ -41,6 +42,7 @@ const updateMembershipLevelSchema = z.object({
   color: z.string().max(16).optional(),
   enabled: z.boolean().optional(),
   sort: z.number().int().optional(),
+  defaultRole: z.string().min(1).max(32).optional(),
 });
 
 export const membershipLevelRouter = router({

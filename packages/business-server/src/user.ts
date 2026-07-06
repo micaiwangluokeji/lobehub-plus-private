@@ -7,6 +7,8 @@ import { CreditTransactionsModel } from '@/database/models/creditTransactions';
 import { PaymentPlansModel } from '@/database/models/paymentPlans';
 import { InviteCodesModel } from '@/database/models/inviteCodes';
 import { SubscriptionsModel } from '@/database/models/subscriptions';
+import { MembershipLevelsModel } from '@/database/models/membershipLevels';
+import { syncMembershipRole } from '@/services/membership';
 
 export interface OnUserActivityForBusinessParams {
   currentTime: Date;
@@ -99,6 +101,13 @@ export async function initNewUserForBusiness(
       // Mark invite code as used
       await inviteModel.markUsed(inviteCode, userId);
     }
+  }
+
+  // 3. Assign default membership role
+  const levelsModel = new MembershipLevelsModel(db);
+  const defaultLevel = await levelsModel.getDefaultLevel();
+  if (defaultLevel) {
+    await syncMembershipRole(db, userId, defaultLevel.id);
   }
 }
 

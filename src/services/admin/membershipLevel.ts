@@ -14,6 +14,7 @@ export interface CreateMembershipLevelParams {
   color?: string;
   enabled?: boolean;
   sort?: number;
+  defaultRole?: string;
 }
 
 export interface UpdateMembershipLevelParams {
@@ -29,6 +30,7 @@ export interface UpdateMembershipLevelParams {
   color?: string;
   enabled?: boolean;
   sort?: number;
+  defaultRole?: string;
 }
 
 class AdminMembershipLevelService {
