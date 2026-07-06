@@ -8,7 +8,7 @@ import { PaymentPlansModel } from '@/database/models/paymentPlans';
 import { InviteCodesModel } from '@/database/models/inviteCodes';
 import { SubscriptionsModel } from '@/database/models/subscriptions';
 import { MembershipLevelsModel } from '@/database/models/membershipLevels';
-import { syncMembershipRole } from '@/services/membership';
+import { syncMembershipRole } from '@/business/server/services/membership';
 
 export interface OnUserActivityForBusinessParams {
   currentTime: Date;
