@@ -1,4 +1,4 @@
-name: Sync Canary to Gitee
+name: Sync Canary to Gitee & Private Repo
 
 permissions:
   contents: write
@@ -16,7 +16,7 @@ on:
 
 jobs:
   sync-and-push:
-    name: Sync upstream canary and push to Gitee
+    name: Sync canary to Gitee & private repo
     runs-on: ubuntu-latest
     if: ${{ github.event.repository.fork }}
 
@@ -47,21 +47,32 @@ jobs:
         env:
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
         run: |
-          # 配置 git 凭证（比 URL 内嵌方式更可靠）
           git config --global credential.helper store
           echo "https://pieth:${GITEE_TOKEN}@gitee.com" > ~/.git-credentials
-
           git remote rm gitee 2>/dev/null || true
           git remote add gitee https://gitee.com/pieth/lobehub-plus.git
           git push -f gitee canary
-
           rm -f ~/.git-credentials
           git config --global --unset credential.helper || true
 
+      - name: Push to private GitHub repo canary
+        env:
+          GH_PAT: ${{ secrets.GH_PRIVATE_REPO_PAT }}
+        run: |
+          git config --global credential.helper store
+          echo "https://piepiepie:${GH_PAT}@github.com" > ~/.git-credentials
+          git remote rm private_repo 2>/dev/null || true
+          git remote add private_repo https://github.com/micaiwangluokeji/lobehub-plus-private.git
+          git push -f private_repo canary
+          rm -f ~/.git-credentials
+          git config --global --unset credential.helper || true
+
+      - name: Print sync summary
+        run: |
           echo "### 🚀 同步完成" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| 步骤 | 结果 |" >> $GITHUB_STEP_SUMMARY
+          echo "| 目标 | 状态 |" >> $GITHUB_STEP_SUMMARY
           echo "|------|------|" >> $GITHUB_STEP_SUMMARY
-          echo "| 上游 | \`lobehub/lobehub\` (canary) |" >> $GITHUB_STEP_SUMMARY
-          echo "| 目标 | \`pieth/lobehub-plus\` (Gitee canary) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Gitee \`pieth/lobehub-plus\` (canary) | ✅ 已推送 |" >> $GITHUB_STEP_SUMMARY
+          echo "| GitHub \`micaiwangluokeji/lobehub-plus-private\` (canary) | ✅ 已推送 |" >> $GITHUB_STEP_SUMMARY
           echo "| 最新提交 | \`$(git log --oneline -1)\` |" >> $GITHUB_STEP_SUMMARY
