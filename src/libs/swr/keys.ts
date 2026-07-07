@@ -574,6 +574,7 @@ export const billingKeys = {
 
 // ---- stats (settings/stats + user header counts) ------------------------
 export const statsKeys = {
+  countAgents: def('stats:countAgents', () => ['stats:countAgents']),
   countMessages: def('stats:countMessages', () => ['stats:countMessages']),
   countSessions: def('stats:countSessions', () => ['stats:countSessions']),
   countTopics: def('stats:countTopics', () => ['stats:countTopics']),
