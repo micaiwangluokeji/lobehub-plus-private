@@ -47,14 +47,21 @@ jobs:
         env:
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
         run: |
-          # 如果没有新提交，也仍执行推送（确保 Gitee 与 GitHub fork 一致）
-          git remote add gitee https://pieth:${GITEE_TOKEN}@gitee.com/pieth/lobehub-plus.git
+          # 配置 git 凭证（比 URL 内嵌方式更可靠）
+          git config --global credential.helper store
+          echo "https://pieth:${GITEE_TOKEN}@gitee.com" > ~/.git-credentials
+
+          git remote rm gitee 2>/dev/null || true
+          git remote add gitee https://gitee.com/pieth/lobehub-plus.git
           git push -f gitee canary
+
+          rm -f ~/.git-credentials
+          git config --global --unset credential.helper || true
+
           echo "### 🚀 同步完成" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| 步骤 | 结果 |" >> $GITHUB_STEP_SUMMARY
           echo "|------|------|" >> $GITHUB_STEP_SUMMARY
-          echo "| 上游可引用 (canary) | \`lobehub/lobehub\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| 目标仓库 | \`pieth/lobehub-plus\` (Gitee) |" >> $GITHUB_STEP_SUMMARY
-          echo "| 目标分支 | \`canary\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 上游 | \`lobehub/lobehub\` (canary) |" >> $GITHUB_STEP_SUMMARY
+          echo "| 目标 | \`pieth/lobehub-plus\` (Gitee canary) |" >> $GITHUB_STEP_SUMMARY
           echo "| 最新提交 | \`$(git log --oneline -1)\` |" >> $GITHUB_STEP_SUMMARY
