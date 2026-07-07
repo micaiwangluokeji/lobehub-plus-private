@@ -33,6 +33,16 @@ export class MembershipLevelsModel {
     return row || null;
   };
 
+  getDefaultLevel = async () => {
+    const [row] = await this.db
+      .select()
+      .from(membershipLevels)
+      .where(eq(membershipLevels.enabled, true))
+      .orderBy(asc(membershipLevels.level))
+      .limit(1);
+    return row || null;
+  };
+
   create = async (data: NewMembershipLevelItem) => {
     const [row] = await this.db.insert(membershipLevels).values(data).returning();
     return row;

@@ -19,6 +19,7 @@ export const membershipLevels = pgTable('membership_levels', {
   color: varchar('color', { length: 16 }),
   enabled: boolean('enabled').default(true),
   sort: integer('sort').default(0),
+  defaultRole: varchar('default_role', { length: 32 }).default('free_user'),
 
   ...timestamps,
 });
