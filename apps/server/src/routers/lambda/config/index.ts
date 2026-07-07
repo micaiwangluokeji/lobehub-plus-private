@@ -1,9 +1,15 @@
 import { EdgeConfig } from '@lobechat/edge-config';
 import debug from 'debug';
+import { z } from 'zod';
 
+import { withRbacPermission } from '@/business/server/trpc-middlewares/rbacPermission';
 import { businessConfigEndpoints } from '@/business/server/lambda-routers/config';
-import { publicProcedure, router } from '@/libs/trpc/lambda';
-import { getServerFeatureFlagsStateFromRuntimeConfig } from '@/server/featureFlags';
+import { authedProcedure, publicProcedure, router } from '@/libs/trpc/lambda';
+import { serverDatabase } from '@/libs/trpc/lambda/middleware';
+import {
+  getServerFeatureFlagsStateFromRuntimeConfig,
+  publishFeatureFlags,
+} from '@/server/featureFlags';
 import { getServerDefaultAgentConfig, getServerGlobalConfig } from '@/server/globalConfig';
 import {
   type GlobalBillboard,
@@ -54,6 +60,21 @@ const getActiveBillboard = async (): Promise<GlobalBillboard | null> => {
   }
 };
 
+const NAV_ITEM_IDS = ['home', 'discover', 'tasks', 'pages', 'image', 'resource', 'memory', 'community', 'settings', 'profile', 'appearance', 'provider', 'apikey', 'about', 'stats'] as const;
+const NAV_ROLES = ['free_user', 'pro_user', 'vip_user'] as const;
+
+const navVisibilitySchema = z.object(
+  Object.fromEntries(
+    NAV_ITEM_IDS.flatMap((navId) =>
+      NAV_ROLES.map((role) => [`${navId}_${role}`, z.boolean()]),
+    ),
+  ),
+);
+
+const adminProcedure = authedProcedure
+  .use(serverDatabase)
+  .use(withRbacPermission('agent:update:all'));
+
 export const configRouter = router({
   getDefaultAgentConfig: publicProcedure.query(async () => {
     return getServerDefaultAgentConfig();
@@ -72,6 +93,28 @@ export const configRouter = router({
 
     return { billboard, serverConfig, serverFeatureFlags };
   }),
+
+  /**
+   * Update navigation visibility configuration per role.
+   * Only super_admin (agent:update:all) can call this.
+   */
+  updateNavVisibility: adminProcedure
+    .input(navVisibilitySchema)
+    .mutation(async ({ input }) => {
+      log('[Config] Updating nav visibility: %O', input);
+
+      const patch: Record<string, boolean> = {};
+      for (const [key, value] of Object.entries(input)) {
+        // key = 'home_free_user' → flag: 'nav_home_for_free_user'
+        const [navId, ...roleParts] = key.split('_');
+        const role = roleParts.join('_'); // handles role names with underscores e.g. free_user
+        patch[`nav_${navId}_for_${role}`] = value;
+      }
+
+      await publishFeatureFlags(patch);
+
+      return { success: true };
+    }),
 
   ...businessConfigEndpoints,
 });

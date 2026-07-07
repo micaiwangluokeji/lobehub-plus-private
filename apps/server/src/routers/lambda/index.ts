@@ -9,6 +9,16 @@ import { storageOverageRouter } from '@/business/server/lambda-routers/storageOv
 import { subscriptionRouter } from '@/business/server/lambda-routers/subscription';
 import { taskTemplateRouter } from '@/business/server/lambda-routers/taskTemplate';
 import { topUpRouter } from '@/business/server/lambda-routers/topUp';
+import { paymentRouter } from '@/business/server/lambda-routers/payment';
+import { planRouter } from '@/business/server/lambda-routers/plan';
+import { revenueRouter } from '@/business/server/lambda-routers/revenue';
+import { creditTransactionRouter } from '@/business/server/lambda-routers/creditTransaction';
+import { dictConfigRouter } from '@/business/server/lambda-routers/dictConfig';
+import { membershipLevelRouter } from '@/business/server/lambda-routers/membershipLevel';
+import { refundRequestRouter } from '@/business/server/lambda-routers/refundRequest';
+import { contentModerationRouter } from '@/business/server/lambda-routers/contentModeration';
+import { rbacSyncRouter } from '@/business/server/lambda-routers/rbacSync';
+import { systemHealthRouter } from '@/business/server/lambda-routers/systemHealth';
 import { workspaceRouter } from '@/business/server/lambda-routers/workspace';
 import { workspaceAuditLogRouter } from '@/business/server/lambda-routers/workspaceAuditLog';
 import { workspaceCreditsRouter } from '@/business/server/lambda-routers/workspaceCredits';
@@ -163,6 +173,16 @@ export const lambdaRouter = router({
   subscription: subscriptionRouter,
   taskTemplate: taskTemplateRouter,
   topUp: topUpRouter,
+  payment: paymentRouter,
+  plan: planRouter,
+  revenue: revenueRouter,
+  creditTransaction: creditTransactionRouter,
+  dictConfig: dictConfigRouter,
+  rbacSync: rbacSyncRouter,
+  membershipLevel: membershipLevelRouter,
+  refundRequest: refundRequestRouter,
+  contentModeration: contentModerationRouter,
+  systemHealth: systemHealthRouter,
 });
 
 export type LambdaRouter = typeof lambdaRouter;

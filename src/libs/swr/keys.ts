@@ -90,23 +90,6 @@ export const agentKeys = {
   list: def('agent:list', (isLogin: boolean) => ['agent:list', isLogin]),
 };
 
-// ---- agent builder (opening-suggestion chips) ---------------------------
-// Kept off `CACHE_TIERS` on purpose — these are ephemeral LLM-generated chips.
-// `contextSummary` is intentionally NOT part of the key so config autosaves for
-// the same target don't refetch; `nonce` bumps on manual refresh.
-export const agentBuilderKeys = {
-  suggestions: def(
-    'agentBuilder:suggestions',
-    (mode: string, builderAgentId: string, targetId: string | undefined, nonce: number) => [
-      'agentBuilder:suggestions',
-      mode,
-      builderAgentId,
-      targetId,
-      nonce,
-    ],
-  ),
-};
-
 // ---- group --------------------------------------------------------------
 export const groupKeys = {
   detail: def('group:detail', (groupId: string) => ['group:detail', groupId]),
@@ -134,40 +117,17 @@ export const threadKeys = {
 
 // ---- recent -------------------------------------------------------------
 export const recentKeys = {
-  /** Home "all recents" drawer list, keyed by open state and identity scope. */
-  allDrawer: def('recent:allDrawer', (open: boolean, scope: string) => [
-    'recent:allDrawer',
-    open,
-    scope,
-  ]),
-  /** Home recents list, keyed by login + limit + identity scope. */
-  list: def('recent:list', (isLogin: boolean, limit: number, scope: string) => [
-    'recent:list',
-    isLogin,
-    limit,
-    scope,
-  ]),
+  /** Home "all recents" drawer list, keyed by open state. */
+  allDrawer: def('recent:allDrawer', (open: boolean) => ['recent:allDrawer', open]),
+  /** Home recents list, keyed by login + limit. */
+  list: def('recent:list', (isLogin: boolean, limit: number) => ['recent:list', isLogin, limit]),
 };
 
 // ---- task ---------------------------------------------------------------
 export const taskKeys = {
   detail: def('task:detail', (taskId: string) => ['task:detail', taskId]),
-  groupList: def(
-    'task:groupList',
-    (agentKey: string | undefined, visibility: 'all' | 'private' | 'workspace' = 'all') => [
-      'task:groupList',
-      agentKey,
-      visibility,
-    ],
-  ),
-  list: def(
-    'task:list',
-    (agentKey: string | undefined, visibility: 'all' | 'private' | 'workspace' = 'all') => [
-      'task:list',
-      agentKey,
-      visibility,
-    ],
-  ),
+  groupList: def('task:groupList', (agentKey: string | undefined) => ['task:groupList', agentKey]),
+  list: def('task:list', (agentKey: string | undefined) => ['task:list', agentKey]),
 };
 
 // ---- brief --------------------------------------------------------------
@@ -440,12 +400,8 @@ export const ragEvalKeys = {
 // ---- knowledge base -----------------------------------------------------
 export const knowledgeBaseKeys = {
   item: def('knowledgeBase:item', (id: string) => ['knowledgeBase:item', id]),
-  list: def(
-    'knowledgeBase:list',
-    (workspaceId?: string | null, visibility?: 'private' | 'public') => {
-      const base = workspaceId ? ['knowledgeBase:list', workspaceId] : ['knowledgeBase:list'];
-      return visibility ? [...base, visibility] : base;
-    },
+  list: def('knowledgeBase:list', (workspaceId?: string | null) =>
+    workspaceId ? ['knowledgeBase:list', workspaceId] : ['knowledgeBase:list'],
   ),
 };
 
@@ -489,11 +445,6 @@ export const deviceKeys = {
   ),
   gitWorkingTreeStatus: def('device:gitWorkingTreeStatus', (deviceId: string, path: string) => [
     'device:gitWorkingTreeStatus',
-    deviceId,
-    path,
-  ]),
-  gitWorktrees: def('device:gitWorktrees', (deviceId: string, path: string) => [
-    'device:gitWorktrees',
     deviceId,
     path,
   ]),
@@ -578,13 +529,10 @@ export const globalKeys = {
 
 // ---- agent knowledge (kept off the `agent:` idb tier on purpose) --------
 export const agentKnowledgeKeys = {
-  list: def(
+  list: def('agentKnowledge:list', (agentId: string | undefined) => [
     'agentKnowledge:list',
-    (agentId: string | undefined, visibility?: 'private' | 'public') => {
-      const base = ['agentKnowledge:list', agentId] as const;
-      return visibility ? [...base, visibility] : base;
-    },
-  ),
+    agentId,
+  ]),
 };
 
 // ---- agent bot ----------------------------------------------------------
@@ -611,20 +559,21 @@ export const chatToolKeys = {
 // header is `portal:` not `document:`.
 // =========================================================================
 
+// ---- billing (credits / plans / referral) --------------------------------
+export const billingKeys = {
+  creditBalance: def('billing:creditBalance', () => ['billing:creditBalance']),
+  creditHistory: def('billing:creditHistory', (page: number) => ['billing:creditHistory', page]),
+  publicPlans: def('billing:publicPlans', () => ['billing:publicPlans']),
+  creditConfig: def('billing:creditConfig', () => ['billing:creditConfig']),
+  membershipLevels: def('billing:membershipLevels', () => ['billing:membershipLevels']),
+  referralStats: def('billing:referralStats', () => ['billing:referralStats']),
+  myReferrals: def('billing:myReferrals', () => ['billing:myReferrals']),
+  myOrders: def('billing:myOrders', () => ['billing:myOrders']),
+  activeSubscription: def('billing:activeSubscription', () => ['billing:activeSubscription']),
+};
+
 // ---- stats (settings/stats + user header counts) ------------------------
 export const statsKeys = {
-  agentUsageStat: def(
-    'stats:agentUsageStat',
-    (agentId: string, startAt: string, endAt: string, granularity: string) => [
-      'stats:agentUsageStat',
-      agentId,
-      startAt,
-      endAt,
-      granularity,
-    ],
-  ),
-  agents: def('stats:agents', () => ['stats:agents']),
-  countAgents: def('stats:countAgents', () => ['stats:countAgents']),
   countMessages: def('stats:countMessages', () => ['stats:countMessages']),
   countSessions: def('stats:countSessions', () => ['stats:countSessions']),
   countTopics: def('stats:countTopics', () => ['stats:countTopics']),
@@ -672,15 +621,6 @@ export const verifyKeys = {
     'verify:reportBundle',
     verifyRunId,
   ]),
-  reportSummaries: def(
-    'verify:reportSummaries',
-    (workspaceId?: string | null, q?: string, cursor?: string) => [
-      'verify:reportSummaries',
-      workspaceId ?? '',
-      q ?? '',
-      cursor ?? '',
-    ],
-  ),
   results: def('verify:results', (operationId: string) => ['verify:results', operationId]),
   rubric: def('verify:rubric', (rubricId: string) => ['verify:rubric', rubricId]),
   rubricCriteria: def('verify:rubricCriteria', (rubricId: string) => [
@@ -703,6 +643,54 @@ export const inboxKeys = {
     ],
   ),
   unreadCount: def('inbox:unreadCount', () => ['inbox:unreadCount']),
+};
+
+// ---- officialAgent (admin-published marketplace agents) ----------------
+export const officialAgentKeys = {
+  detail: def('officialAgent:detail', (agentId: string) => ['officialAgent:detail', agentId]),
+  isOfficial: def('officialAgent:isOfficial', (agentId: string) => [
+    'officialAgent:isOfficial',
+    agentId,
+  ]),
+  isPendingReview: def('officialAgent:isPendingReview', (agentId: string) => [
+    'officialAgent:isPendingReview',
+    agentId,
+  ]),
+  list: def('officialAgent:list', (keyword?: string, page?: number, pageSize?: number) => [
+    'officialAgent:list',
+    keyword ?? '',
+    page ?? 1,
+    pageSize ?? 20,
+  ]),
+  pendingReviews: def('officialAgent:pendingReviews', (page?: number, pageSize?: number) => [
+    'officialAgent:pendingReviews',
+    page ?? 1,
+    pageSize ?? 20,
+  ]),
+};
+
+// ---- officialGroup (admin-published marketplace agent groups) -----------
+export const officialGroupKeys = {
+  detail: def('officialGroup:detail', (groupId: string) => ['officialGroup:detail', groupId]),
+  isOfficial: def('officialGroup:isOfficial', (groupId: string) => [
+    'officialGroup:isOfficial',
+    groupId,
+  ]),
+  isPendingReview: def('officialGroup:isPendingReview', (groupId: string) => [
+    'officialGroup:isPendingReview',
+    groupId,
+  ]),
+  list: def('officialGroup:list', (keyword?: string, page?: number, pageSize?: number) => [
+    'officialGroup:list',
+    keyword ?? '',
+    page ?? 1,
+    pageSize ?? 20,
+  ]),
+  pendingReviews: def('officialGroup:pendingReviews', (page?: number, pageSize?: number) => [
+    'officialGroup:pendingReviews',
+    page ?? 1,
+    pageSize ?? 20,
+  ]),
 };
 
 // ---- share (shared topic / page) ----------------------------------------
@@ -869,6 +857,8 @@ export const gatewayKeys = {
 export const userKeys = {
   checkTrace: def('user:checkTrace', () => ['user:checkTrace']),
   initState: def('user:initState', () => ['user:initState']),
+  permissions: def('user:permissions', () => ['user:permissions']),
+  roles: def('user:roles', () => ['user:roles']),
 };
 export const builtinAgentKeys = {
   init: def('builtinAgent:init', (slug: string) => ['builtinAgent:init', slug]),
@@ -906,7 +896,6 @@ export const matchDomain =
 export const swrKeys = {
   agent: { ...agentKeys, ...agentConfigKeys },
   agentBot: agentBotKeys,
-  agentBuilder: agentBuilderKeys,
   agentDocument: agentDocumentSWRKeys,
   agentHome: agentHomeKeys,
   agentKnowledge: agentKnowledgeKeys,
@@ -940,9 +929,12 @@ export const swrKeys = {
   message: messageKeys,
   messenger: messengerKeys,
   notebook: notebookSWRKeys,
+  officialAgent: officialAgentKeys,
+  officialGroup: officialGroupKeys,
   ollama: ollamaKeys,
   onboarding: onboardingKeys,
   openInApp: openInAppKeys,
+  billing: billingKeys,
   portal: portalKeys,
   provider: providerKeys,
   ragEval: ragEvalKeys,

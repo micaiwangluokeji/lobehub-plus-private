@@ -36,6 +36,10 @@ export const users = pgTable(
 
     // better-auth admin
     role: text('role'),
+    // isRoot admin flag — bypasses all RBAC permission checks (similar to LifeOS isRoot)
+    isRoot: boolean('is_root').default(false).notNull(),
+    // Membership level — references membership_levels table
+    membershipLevelId: text('membership_level_id'),
     banned: boolean('banned').default(false),
     banReason: text('ban_reason'),
     banExpires: timestamptz('ban_expires'),

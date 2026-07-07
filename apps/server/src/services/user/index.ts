@@ -1,5 +1,6 @@
 import { ENABLE_BUSINESS_FEATURES } from '@lobechat/business-const';
-import { type LobeChatDatabase } from '@lobechat/database';
+import { SYSTEM_DEFAULT_ROLES } from '@lobechat/const/rbac';
+import { assignSystemRoleToUser, type LobeChatDatabase } from '@lobechat/database';
 
 import { initNewUserForBusiness } from '@/business/server/user';
 import { UserModel } from '@/database/models/user';
@@ -27,11 +28,25 @@ export class UserService {
   async initUser(user: CreatedUser) {
     if (ENABLE_BUSINESS_FEATURES) {
       try {
-        await initNewUserForBusiness(user.id, user.createdAt);
+        await initNewUserForBusiness(user.id, user.createdAt, this.db);
       } catch (error) {
         console.error(error);
         console.error('Failed to init new user for business');
       }
+    }
+
+    // Assign the default free_user role to every newly created account.
+    // Runs outside the ENABLE_BUSINESS_FEATURES gate so OSS deployments also
+    // enforce role-based access. Idempotent — safe even if a commercial
+    // override already granted a role via initNewUserForBusiness.
+    try {
+      await assignSystemRoleToUser(this.db, {
+        roleName: SYSTEM_DEFAULT_ROLES.FREE_USER,
+        userId: user.id,
+      });
+    } catch (error) {
+      console.error(error);
+      console.error('Failed to assign default free_user role to new user');
     }
 
     const analytics = await initializeServerAnalytics();
