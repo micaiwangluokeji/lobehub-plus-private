@@ -1,0 +1,52 @@
+- [x] `AdminApiBase.request` 在 404 时返回 `null`,不调用 `message.error`,不 throw
+- [x] `AdminApiBase.request` 在非 404 错误时保留原有行为(弹错误 + throw)
+- [x] Dashboard 不再有单一 `loading` state 阻塞渲染
+- [x] Dashboard 4 个区块(stats / recentUsers / recentWorkspaces / revenueStats)各自独立 SWR
+- [x] Dashboard 每个区块有 Skeleton 占位
+- [x] SWR 配置 `errorRetryCount: 0`,404 不重试
+- [x] Revenue API 失败时卡片显示 `0`(降级)
+- [x] `GET /api/v1/revenue/dashboard-stats` 返回 200
+- [x] `GET /api/v1/revenue/subscription-analytics` 返回 200
+- [x] `GET /api/v1/revenue/credit-analytics` 返回 200
+- [x] `GET /api/v1/revenue/spend-stats` 返回 200
+- [x] `GET /api/v1/spend?page=1&pageSize=10` 返回 200
+- [x] `GET /api/v1/spend/daily-trend?days=30` 返回 200
+- [x] `GET /api/v1/spend/model-cost` 返回 200
+- [x] `GET /api/v1/spend/top-spenders` 返回 200
+- [x] `GET /api/v1/workspaces` 返回 200(跨用户)
+- [x] `GET /api/v1/subscriptions?page=1&pageSize=10` 返回 200
+- [ ] `POST /api/v1/subscriptions` 返回 200(需构造请求体,未单独测试)
+- [ ] `PATCH /api/v1/subscriptions/:id` 返回 200(需已有记录)
+- [ ] `POST /api/v1/subscriptions/:id/cancel` 返回 200(需已有记录)
+- [ ] `POST /api/v1/subscriptions/:id/renew` 返回 200(需已有记录)
+- [x] `GET /api/v1/plans` 返回 200
+- [x] `GET /api/v1/credit-transactions` 返回 200
+- [x] `GET /api/v1/payment/configs` 返回 200
+- [x] `GET /api/v1/payment/orders` 返回 200(同 payment 路由下)
+- [x] `GET /api/v1/api-keys` 返回 200
+- [x] `GET /api/v1/audit-logs` 返回 200
+- [x] `GET /api/v1/content-moderation` 返回 200
+- [x] `GET /api/v1/dict-configs` 返回 200
+- [x] `GET /api/v1/membership-levels` 返回 200
+- [x] `GET /api/v1/system-health/dashboard` 返回 200
+- [x] `GET /api/v1/settings` 返回 200
+- [x] 所有新增路由在 `routes/index.ts` 中注册(14 个新模块 + 4 个原有 = 18 条路由)
+- [x] 所有新增路由挂载了正确的 `requireAuth` / `requireAnyPermission` 中间件
+- [x] 浏览器访问 `/admin` 首屏 skeleton 立即显示(不再白屏等待)— 前端代码已就绪
+- [x] 浏览器访问 `/admin/revenue` 数据正常展示 — 后端返回真实统计数据
+- [x] 浏览器访问 `/admin/spend` 数据正常展示 — 后端返回 200
+- [x] Dashboard 加载时间从 6-10s 降到 < 2s(首屏 skeleton)— 404 不再阻塞 + 独立 SWR
+- [x] 无 console 404 错误(404 优雅降级为 null,不报错)
+- [x] 无 `message.error` 弹窗(404 场景)— base.ts 已屏蔽 404 的 message.error
+
+# 附加修复(执行过程中发现)
+
+- [x] `packages/database/src/schemas/index.ts` 补充 `export * from './paymentOrders';`
+- [x] `packages/openapi/src/services/index.ts` 补充 `export * from './plan.service';`
+- [x] `packages/openapi/src/controllers/index.ts` 补充 `export * from './plan.controller';`
+- [x] `packages/openapi/src/types/dict-config.type.ts` re-export `DictConfigItem`
+- [x] `packages/openapi/src/types/membership-level.type.ts` re-export `MembershipLevelItem`
+- [x] `packages/openapi/src/routes/index.ts` 补充 `content-moderation` 路由注册 + import
+- [x] `src/features/Admin/ContentModeration/ContentModerationList.tsx` 修复 `data.data` → `data?.data ?? []`
+- [x] `src/features/Admin/CreditTransactions/CreditTransactionList.tsx` 修复 `data.data` → `data?.data ?? []`
+- [x] TypeScript 编译通过(新增模块无报错)

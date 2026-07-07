@@ -37,6 +37,7 @@ export * from './topic';
 export * from './user';
 export * from './userMemories';
 export * from './verify';
+export * from './paymentOrders';
 export * from './paymentPlans';
 export * from './subscriptions';
 export * from './creditTransactions';

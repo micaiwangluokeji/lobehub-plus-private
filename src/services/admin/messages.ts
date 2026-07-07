@@ -23,8 +23,9 @@ interface PaginatedResponse<T> {
 import { AdminApiBase } from './base';
 
 class AdminMessageService extends AdminApiBase {
-  async list(params: { keyword?: string; role?: string; page?: number; pageSize?: number }) {
+  async list(params: { keyword?: string; role?: string; page?: number; pageSize?: number; filter?: string }) {
     return this.get<PaginatedResponse<AdminMessage>>('/messages', {
+      filter: params.filter ?? '{}',
       keyword: params.keyword,
       role: params.role,
       page: params.page,

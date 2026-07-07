@@ -35,8 +35,9 @@ const SpendList = memo(() => {
   const fetchSpendLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await adminSpendService.list(filters);
-      setSpendLogs(data.data);
+      const res = await adminSpendService.list(filters);
+      const body = res as unknown as { data: { data: SpendLogItem[] } };
+      setSpendLogs(body?.data?.data ?? []);
     } catch {
       message.error(t('spend.fetchFailed'));
     } finally {

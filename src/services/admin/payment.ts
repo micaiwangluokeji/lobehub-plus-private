@@ -8,6 +8,11 @@ export interface PaymentConfigWechat {
   mchId?: string;
   apiKey?: string;
   apiCert?: string;
+  payVersion?: 'V2' | 'V3';
+  merchantType?: 'ordinary' | 'service_provider';
+  paySignKey?: string;
+  payAuthDir?: string;
+  logo?: string;
 }
 
 export interface PaymentConfigAlipay {
@@ -16,6 +21,7 @@ export interface PaymentConfigAlipay {
   privateKey?: string;
   publicKey?: string;
   gateway?: 'production' | 'sandbox';
+  logo?: string;
 }
 
 // UI-facing type (general is nested for antd Form name paths)
@@ -45,6 +51,11 @@ const toUIConfig = (backend: {
     mchId: backend.wechat?.mchId ?? '',
     apiKey: backend.wechat?.apiKey ?? '',
     apiCert: backend.wechat?.apiCert ?? '',
+    payVersion: backend.wechat?.payVersion ?? 'V3',
+    merchantType: backend.wechat?.merchantType ?? 'ordinary',
+    paySignKey: backend.wechat?.paySignKey ?? '',
+    payAuthDir: backend.wechat?.payAuthDir ?? '',
+    logo: backend.wechat?.logo ?? '',
   },
   alipay: {
     enabled: backend.alipay?.enabled ?? false,
@@ -52,6 +63,7 @@ const toUIConfig = (backend: {
     privateKey: backend.alipay?.privateKey ?? '',
     publicKey: backend.alipay?.publicKey ?? '',
     gateway: backend.alipay?.gateway ?? 'production',
+    logo: backend.alipay?.logo ?? '',
   },
   general: {
     currency: backend.currency ?? 'CNY',

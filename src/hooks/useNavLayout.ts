@@ -50,7 +50,9 @@ export const useNavLayout = (): NavLayout => {
         ? null // super_admin always sees everything
         : primaryRole === 'vip_user'
           ? 'ForVipUser'
-          : 'ForFreeUser';
+          : primaryRole === 'pro_user'
+            ? 'ForProUser'
+            : 'ForFreeUser';
 
     return (navId: string) => {
       if (!roleSuffix) return true; // super_admin sees all
@@ -111,7 +113,7 @@ export const useNavLayout = (): NavLayout => {
           url: '/image',
         },
         {
-          hidden: !showMarket || !canManageOfficial,
+          hidden: !showMarket || !canManageOfficial || !isNavVisibleForRole('community'),
           icon: getRouteById('community')!.icon,
           key: SidebarTabKey.Community,
           title: t('tab.community'),
@@ -140,9 +142,9 @@ export const useNavLayout = (): NavLayout => {
       hideGitHub: !!hideGitHub,
       layout: 'compact' as const,
       showEvalEntry: false,
-      showSettingsEntry: true,
+      showSettingsEntry: isNavVisibleForRole('settings'),
     }),
-    [hideGitHub],
+    [hideGitHub, isNavVisibleForRole],
   );
 
   const userPanel = useMemo(

@@ -39,8 +39,9 @@ const SubscriptionList = memo(() => {
   const fetchSubscriptions = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await adminSubscriptionService.list(filters);
-      setSubscriptions(data.data);
+      const res = await adminSubscriptionService.list(filters);
+      const body = res as unknown as { data: { data: SubscriptionItem[] } };
+      setSubscriptions(body?.data?.data ?? []);
     } catch {
       message.error(t('subscriptions.fetchFailed'));
     } finally {

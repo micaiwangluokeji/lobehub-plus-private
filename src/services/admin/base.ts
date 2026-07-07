@@ -19,7 +19,7 @@ class AdminApiBase {
     return {};
   }
 
-  protected async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  protected async request<T>(path: string, options: RequestOptions = {}): Promise<T | null> {
     const { params, ...fetchOptions } = options;
 
     let url = `${this.baseUrl}${path}`;
@@ -48,6 +48,9 @@ class AdminApiBase {
     });
 
     if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
       const errorBody = await response.json().catch(() => ({}));
       const errorMessage =
         typeof errorBody.message === 'string'
@@ -62,25 +65,25 @@ class AdminApiBase {
     return response.json();
   }
 
-  protected async get<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
+  async get<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T | null> {
     return this.request<T>(path, { method: 'GET', params });
   }
 
-  protected async post<T>(path: string, body?: unknown): Promise<T> {
+  protected async post<T>(path: string, body?: unknown): Promise<T | null> {
     return this.request<T>(path, {
       body: body ? JSON.stringify(body) : undefined,
       method: 'POST',
     });
   }
 
-  protected async patch<T>(path: string, body?: unknown): Promise<T> {
+  protected async patch<T>(path: string, body?: unknown): Promise<T | null> {
     return this.request<T>(path, {
       body: body ? JSON.stringify(body) : undefined,
       method: 'PATCH',
     });
   }
 
-  protected async delete<T>(path: string): Promise<T> {
+  protected async delete<T>(path: string): Promise<T | null> {
     return this.request<T>(path, { method: 'DELETE' });
   }
 }
