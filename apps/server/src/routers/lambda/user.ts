@@ -179,6 +179,20 @@ export const userRouter = router({
     } satisfies UserInitializationState;
   }),
 
+  getUserPermissions: userProcedure.query(async ({ ctx }) => {
+    const rbacModel = new RbacModel(ctx.serverDB, ctx.userId);
+    return rbacModel.getUserPermissions({
+      workspaceId: ctx.workspaceId ?? undefined,
+    });
+  }),
+
+  getUserRoles: userProcedure.query(async ({ ctx }) => {
+    const rbacModel = new RbacModel(ctx.serverDB, ctx.userId);
+    return rbacModel.getUserRoles({
+      workspaceId: ctx.workspaceId ?? undefined,
+    });
+  }),
+
   makeUserOnboarded: userProcedure.mutation(async ({ ctx }) => {
     return ctx.userModel.updateUser({ isOnboarded: true });
   }),

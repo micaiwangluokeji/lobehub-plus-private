@@ -1,1 +1,1 @@
-ALTER TABLE "membership_levels" ADD COLUMN "default_role" varchar(32) DEFAULT 'free_user';
+ALTER TABLE "membership_levels" ADD COLUMN IF NOT EXISTS "default_role" varchar(32) DEFAULT 'free_user';

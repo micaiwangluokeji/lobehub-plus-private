@@ -15,7 +15,7 @@ import TotalCard from './ShareButton/TotalCard';
 
 const TotalMessages = memo<{ inShare?: boolean; mobile?: boolean }>(({ inShare }) => {
   const { t } = useTranslation('auth');
-  const { data, isLoading, error, mutate } = useClientDataSWR(statsKeys.agents(), async () => ({
+  const { data, isLoading, error, mutate } = useClientDataSWR(statsKeys.countAgents(), async () => ({
     count: await agentService.countAgents(),
     prevCount: await agentService.countAgents({ endDate: lastMonth().format('YYYY-MM-DD') }),
   }));

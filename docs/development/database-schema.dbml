@@ -671,6 +671,21 @@ table chat_groups_agents {
   }
 }
 
+table chat_group_shares {
+  id uuid [pk, not null, default: `gen_random_uuid()`]
+  chat_group_id text [not null]
+  visibility text [not null, default: 'private']
+  user_view_count integer [not null, default: 0]
+  accessed_at "timestamp with time zone" [not null, default: `now()`]
+  created_at "timestamp with time zone" [not null, default: `now()`]
+  updated_at "timestamp with time zone" [not null, default: `now()`]
+
+  indexes {
+    chat_group_id [name: 'chat_group_shares_chat_group_id_unique', unique]
+    visibility [name: 'chat_group_shares_visibility_idx']
+  }
+}
+
 table user_connector_tools {
   id uuid [pk, not null, default: `gen_random_uuid()`]
   user_connector_id uuid [not null]
@@ -2236,6 +2251,8 @@ table users {
   email_verified_at "timestamp with time zone"
   preference jsonb
   role text
+  is_root boolean [not null, default: false]
+  membership_level_id text
   banned boolean [default: false]
   ban_reason text
   ban_expires "timestamp with time zone"
@@ -2645,6 +2662,153 @@ table verify_runs {
   }
 }
 
+table payment_orders {
+  id text [pk, not null]
+  user_id text [not null]
+  plan_id text
+  amount "numeric(10, 2)" [not null]
+  credits integer [not null, default: 0]
+  status varchar(20) [not null, default: 'pending']
+  prepay_id varchar(64)
+  transaction_id varchar(64)
+  wx_code_url varchar(512)
+  wx_h5_url varchar(512)
+  paid_at "timestamp with time zone"
+  expired_at "timestamp with time zone" [not null]
+  refund_status varchar(20)
+  refund_amount "numeric(10, 2)"
+  description text
+  accessed_at "timestamp with time zone" [not null, default: `now()`]
+  created_at "timestamp with time zone" [not null, default: `now()`]
+  updated_at "timestamp with time zone" [not null, default: `now()`]
+
+  indexes {
+    user_id [name: 'payment_orders_user_id_idx']
+    status [name: 'payment_orders_status_idx']
+    prepay_id [name: 'payment_orders_prepay_id_idx']
+  }
+}
+
+table credit_configs {
+  id text [pk, not null]
+  price_per_credit "numeric(10, 4)" [default: 0.01]
+  min_top_up_amount "numeric(10, 2)" [default: 1]
+  max_top_up_amount "numeric(10, 2)" [default: 9999]
+  bonus_rate "numeric(5, 2)" [default: 0]
+  credit_expiry_days integer [default: 365]
+  referral_reward_credits integer [default: 0]
+  default_registration_credits integer [default: 500]
+  accessed_at "timestamp with time zone" [not null, default: `now()`]
+  created_at "timestamp with time zone" [not null, default: `now()`]
+  updated_at "timestamp with time zone" [not null, default: `now()`]
+}
+
+table payment_configs {
+  id text [pk, not null]
+  wechat jsonb [default: `{"enabled":false}`]
+  alipay jsonb [default: `{"enabled":false}`]
+  currency varchar(3) [default: 'CNY']
+  payment_timeout integer [default: 30]
+  notify_url varchar(512)
+  accessed_at "timestamp with time zone" [not null, default: `now()`]
+  created_at "timestamp with time zone" [not null, default: `now()`]
+  updated_at "timestamp with time zone" [not null, default: `now()`]
+}
+
+table plans {
+  id text [pk, not null]
+  name varchar(128) [not null]
+  price "numeric(10, 2)" [not null]
+  monthly_credits integer [not null, default: 0]
+  personal_budget "numeric(15, 2)" [default: 0]
+  workspace_budget "numeric(15, 2)" [default: 0]
+  billing_cycle varchar(16) [not null, default: 'monthly']
+  features jsonb [default: `[]`]
+  enabled boolean [default: true]
+  sort integer [default: 0]
+  accessed_at "timestamp with time zone" [not null, default: `now()`]
+  created_at "timestamp with time zone" [not null, default: `now()`]
+  updated_at "timestamp with time zone" [not null, default: `now()`]
+}
+
+table subscriptions {
+  id text [pk, not null]
+  user_id text [not null]
+  workspace_id text
+  plan_id text
+  status varchar(20) [not null, default: 'active']
+  billing_cycle varchar(20) [not null, default: 'month']
+  current_period_start "timestamp with time zone" [not null]
+  current_period_end "timestamp with time zone" [not null]
+  canceled_at "timestamp with time zone"
+  cancel_reason text
+  payment_provider varchar(50)
+  payment_subscription_id text
+  accessed_at "timestamp with time zone" [not null, default: `now()`]
+  created_at "timestamp with time zone" [not null, default: `now()`]
+  updated_at "timestamp with time zone" [not null, default: `now()`]
+
+  indexes {
+    user_id [name: 'subscriptions_user_id_idx']
+    status [name: 'subscriptions_status_idx']
+    current_period_end [name: 'subscriptions_current_period_end_idx']
+  }
+}
+
+table credit_transactions {
+  id serial [pk, not null, increment]
+  user_id text [not null]
+  workspace_id text
+  type varchar(20) [not null]
+  amount integer [not null]
+  balance_after integer [not null]
+  source varchar(50)
+  reference_id text
+  reference_type varchar(50)
+  description text
+  operator_id text
+  accessed_at "timestamp with time zone" [not null, default: `now()`]
+  created_at "timestamp with time zone" [not null, default: `now()`]
+  updated_at "timestamp with time zone" [not null, default: `now()`]
+
+  indexes {
+    user_id [name: 'credit_transactions_user_id_idx']
+    type [name: 'credit_transactions_type_idx']
+    created_at [name: 'credit_transactions_created_at_idx']
+  }
+}
+
+table spend_logs {
+  id serial [pk, not null, increment]
+  user_id text [not null]
+  workspace_id text
+  session_id text
+  model_id varchar(150)
+  model_name varchar(100)
+  provider_id varchar(64)
+  prompt_tokens integer [not null, default: 0]
+  completion_tokens integer [not null, default: 0]
+  total_tokens integer [not null, default: 0]
+  input_cost "numeric(12, 2)" [not null, default: 0]
+  output_cost "numeric(12, 2)" [not null, default: 0]
+  total_cost "numeric(12, 2)" [not null, default: 0]
+  credits_consumed integer [not null, default: 0]
+  price_per_credit "numeric(12, 4)"
+  duration_ms integer
+  status varchar(20) [not null, default: 'success']
+  error_message text
+  accessed_at "timestamp with time zone" [not null, default: `now()`]
+  created_at "timestamp with time zone" [not null, default: `now()`]
+  updated_at "timestamp with time zone" [not null, default: `now()`]
+
+  indexes {
+    user_id [name: 'spend_logs_user_id_idx']
+    workspace_id [name: 'spend_logs_workspace_id_idx']
+    created_at [name: 'spend_logs_created_at_idx']
+    model_id [name: 'spend_logs_model_id_idx']
+  }
+}
+
 table workspace_audit_logs {
   id text [pk, not null]
   workspace_id text [not null]
@@ -2716,6 +2880,32 @@ table workspaces {
   }
 }
 
+table content_moderation_logs {
+  id uuid [pk, not null, default: `gen_random_uuid()`]
+  user_id uuid
+  content_type varchar(50) [not null]
+  content_id uuid
+  moderation_result varchar(20) [not null]
+  risk_score text
+  flagged_tags text[]
+  reviewed_by uuid
+  reviewed_at timestamp
+  status varchar(20) [default: 'pending']
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+table system_health_checks {
+  id varchar(64) [pk, not null]
+  service_name varchar(100) [not null]
+  status varchar(20) [not null]
+  response_time integer
+  error_message text
+  checked_at timestamp [not null, default: `now()`]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
 ref: agent_skills.user_id - users.id
 
 ref: agent_skills.zip_file_hash - global_files.hash_id
@@ -2768,7 +2958,13 @@ ref: chat_groups_agents.user_id - users.id
 
 ref: chat_groups.user_id - users.id
 
+ref: chat_groups.id - chat_group_shares.chat_group_id
+
 ref: unstructured_chunks.file_id - files.id
+
+ref: credit_transactions.operator_id - users.id
+
+ref: credit_transactions.workspace_id - workspaces.id
 
 ref: document_chunks.document_id > documents.id
 
@@ -2826,8 +3022,32 @@ ref: messages.message_group_id > message_groups.id
 
 ref: sessions.group_id - session_groups.id
 
+ref: spend_logs.user_id - users.id
+
+ref: spend_logs.workspace_id - workspaces.id
+
+ref: spend_logs.session_id - sessions.id
+
+ref: spend_logs.model_id - ai_models.id
+
+ref: spend_logs.provider_id - ai_providers.id
+
+ref: subscriptions.user_id - users.id
+
+ref: subscriptions.workspace_id - workspaces.id
+
+ref: subscriptions.plan_id - plans.id
+
 ref: topic_documents.document_id > documents.id
 
 ref: topic_documents.topic_id > topics.id
 
 ref: topics.session_id - sessions.id
+
+ref: workspace_invitations.inviter_id - users.id
+
+ref: workspace_invitations.workspace_id - workspaces.id
+
+ref: workspace_members.user_id - users.id
+
+ref: workspace_members.workspace_id - workspaces.id

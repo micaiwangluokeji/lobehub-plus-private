@@ -864,6 +864,20 @@ export const userKeys = {
 export const builtinAgentKeys = {
   init: def('builtinAgent:init', (slug: string) => ['builtinAgent:init', slug]),
 };
+
+// ---- agent builder (SuggestionChips LLM-generated suggestions) -----------
+export const agentBuilderKeys = {
+  suggestions: def(
+    'agentBuilder:suggestions',
+    (mode: string, builderAgentId: string, targetId?: string, nonce?: number) => [
+      'agentBuilder:suggestions',
+      mode,
+      builderAgentId,
+      targetId,
+      nonce ?? 0,
+    ],
+  ),
+};
 export const imessageKeys = {
   bridgeStatus: def('imessage:bridgeStatus', () => ['imessage:bridgeStatus']),
 };
@@ -897,6 +911,7 @@ export const matchDomain =
 export const swrKeys = {
   agent: { ...agentKeys, ...agentConfigKeys },
   agentBot: agentBotKeys,
+  agentBuilder: agentBuilderKeys,
   agentDocument: agentDocumentSWRKeys,
   agentHome: agentHomeKeys,
   agentKnowledge: agentKnowledgeKeys,

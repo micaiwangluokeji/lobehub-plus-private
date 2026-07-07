@@ -90,7 +90,7 @@ const HtmlPreviewDrawer = memo<HtmlPreviewDrawerProps>(({ content, open, onClose
   return (
     <Drawer
       destroyOnHidden
-      height={isDesktop ? `calc(100vh - ${TITLE_BAR_HEIGHT}px)` : '100vh'}
+      size={isDesktop ? `calc(100vh - ${TITLE_BAR_HEIGHT}px)` : '100vh'}
       open={open}
       placement="bottom"
       title={Title}
