@@ -24,6 +24,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: canary
+          persist-credentials: false  # 不持久化 GITHUB_TOKEN，避免干扰后续 git push
 
       - name: Sync upstream canary to GitHub fork
         id: sync
@@ -61,16 +62,10 @@ jobs:
         env:
           GH_PAT: ${{ secrets.GH_PRIVATE_REPO_PAT }}
         run: |
-          # 使用 credential.helper store 覆盖 checkout 设置的 GITHUB_TOKEN 凭证
-          git config --global credential.helper store
-          echo "https://piepiepie:${GH_PAT}@github.com" > ~/.git-credentials
-
+          # persist-credentials 已关闭，直接使用 URL 内嵌 Token 推送私有仓库
           git remote rm private_repo 2>/dev/null || true
-          git remote add private_repo https://github.com/micaiwangluokeji/lobehub-plus-private.git
+          git remote add private_repo https://piepiepie:${GH_PAT}@github.com/micaiwangluokeji/lobehub-plus-private.git
           git push -f private_repo canary
-
-          rm -f ~/.git-credentials
-          git config --global --unset credential.helper || true
 
       - name: Print sync summary
         run: |
