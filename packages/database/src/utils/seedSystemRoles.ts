@@ -1,15 +1,64 @@
 import {
+  PERMISSION_ACTIONS,
   ROLE_DESCRIPTIONS,
   SYSTEM_DEFAULT_ROLES,
   SYSTEM_ROLE_DISPLAY_NAMES,
   SYSTEM_ROLE_PERMISSIONS,
   type SystemDefaultRoleName,
 } from '@lobechat/const/rbac';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 
-import { roles, rolePermissions, userRoles } from '../schemas/rbac';
+import { permissions, roles, rolePermissions, userRoles } from '../schemas/rbac';
 import type { LobeChatDatabase } from '../type';
-import { ensurePermissionsExist } from './seedWorkspaceRoles';
+
+const codeToCategory = (code: string): string => code.split(':')[0];
+
+const codeToName = (code: string): string => {
+  const base = code.replace(/:(all|owner)$/, '');
+  const entry = Object.entries(PERMISSION_ACTIONS).find(([, value]) => value === base);
+  if (!entry) return code;
+  return entry[0]
+    .toLowerCase()
+    .split('_')
+    .map((seg) => seg.charAt(0).toUpperCase() + seg.slice(1))
+    .join(' ');
+};
+
+const ensurePermissionsExist = async (
+  db: LobeChatDatabase,
+  codes: string[],
+): Promise<Map<string, string>> => {
+  const codeList = [...new Set(codes)];
+
+  const existing = await db
+    .select({ code: permissions.code, id: permissions.id })
+    .from(permissions)
+    .where(inArray(permissions.code, codeList));
+
+  const existingCodes = new Set(existing.map((p) => p.code));
+  const missing = codeList.filter((code) => !existingCodes.has(code));
+
+  if (missing.length > 0) {
+    await db
+      .insert(permissions)
+      .values(
+        missing.map((code) => ({
+          category: codeToCategory(code),
+          code,
+          isActive: true,
+          name: codeToName(code),
+        })),
+      )
+      .onConflictDoNothing({ target: permissions.code });
+  }
+
+  const all = await db
+    .select({ code: permissions.code, id: permissions.id })
+    .from(permissions)
+    .where(inArray(permissions.code, codeList));
+
+  return new Map(all.map((p) => [p.code, p.id] as const));
+};
 
 /**
  * Collect every permission code referenced by the global system roles so we
