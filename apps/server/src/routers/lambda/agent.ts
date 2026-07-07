@@ -2,28 +2,22 @@ import { DEFAULT_AGENT_CONFIG, INBOX_SESSION_ID } from '@lobechat/const';
 import { CreateAgentSchema, type KnowledgeItem } from '@lobechat/types';
 import { KnowledgeType } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
-import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 
-import { RbacModel } from '@/database/models/rbac';
-import {
-  withRbacPermission,
-  withScopedPermission,
-} from '@/business/server/trpc-middlewares/rbacPermission';
+import { withScopedPermission } from '@/business/server/trpc-middlewares/rbacPermission';
 import { wsCompatProcedure } from '@/business/server/trpc-middlewares/workspaceAuth';
 import { AgentModel } from '@/database/models/agent';
-import { AgentShareModel } from '@/database/models/agentShare';
 import { ChatGroupModel } from '@/database/models/chatGroup';
 import { FileModel } from '@/database/models/file';
 import { KnowledgeBaseModel } from '@/database/models/knowledgeBase';
 import { SessionModel } from '@/database/models/session';
 import { UserModel } from '@/database/models/user';
-import { workspaceMembers } from '@/database/schemas';
 import { router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { AgentService } from '@/server/services/agent';
 import { EditLockService } from '@/server/services/editLock';
 import { publishResourceEvent } from '@/server/services/resourceEvents';
+import { hasWorkspaceScopedPermission } from '@/server/services/workspacePermission';
 import { TransferErrorCode } from '@/types/transferError';
 
 const agentProcedure = wsCompatProcedure.use(serverDatabase).use(async (opts) => {
@@ -34,7 +28,6 @@ const agentProcedure = wsCompatProcedure.use(serverDatabase).use(async (opts) =>
     ctx: {
       agentModel: new AgentModel(ctx.serverDB, ctx.userId, wsId),
       agentService: new AgentService(ctx.serverDB, ctx.userId, wsId),
-      agentShareModel: new AgentShareModel(ctx.serverDB, ctx.userId, wsId),
       chatGroupModel: new ChatGroupModel(ctx.serverDB, ctx.userId, wsId),
       editLockService: new EditLockService(ctx.userId),
       fileModel: new FileModel(ctx.serverDB, ctx.userId, wsId),
@@ -63,7 +56,16 @@ export const agentRouter = router({
    * conditions of queryAgents. Lets paginated callers report real totals.
    */
   countAgents: agentProcedure
-    .input(z.object({ keyword: z.string().optional() }).optional())
+    .input(
+      z
+        .object({
+          endDate: z.string().optional(),
+          keyword: z.string().optional(),
+          range: z.tuple([z.string(), z.string()]).optional(),
+          startDate: z.string().optional(),
+        })
+        .optional(),
+    )
     .query(async ({ input, ctx }) => {
       return ctx.agentModel.countAgents(input);
     }),
@@ -78,15 +80,33 @@ export const agentRouter = router({
       z.object({
         config: CreateAgentSchema.optional(),
         groupId: z.string().optional(),
+        visibility: z.enum(['private', 'public']).optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
       const agent = await ctx.agentModel.create({
         ...input.config,
         sessionGroupId: input.groupId,
+        // Router-level `visibility` wins over any nested config value so the
+        // sidebar's "Create in Private" entry can't be overridden by a stale
+        // default config.
+        ...(input.visibility ? { visibility: input.visibility } : {}),
       });
 
       return { agentId: agent.id };
+    }),
+
+  /**
+   * Publish a private agent into the workspace. **One-way** — once an agent
+   * is shared, workspace members may already depend on it, so it can't slip
+   * back to `private`. Only the creator of a still-private agent can run
+   * this; the underlying SQL enforces both rules.
+   */
+  publishAgentToWorkspace: agentProcedure
+    .use(withScopedPermission('agent:update'))
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      return ctx.agentModel.publishToWorkspace(input.id);
     }),
 
   createAgentFiles: agentProcedure
@@ -266,13 +286,27 @@ export const agentRouter = router({
     .input(
       z.object({
         agentId: z.string(),
+        visibility: z.enum(['private', 'public']).optional(),
       }),
     )
     .query(async ({ ctx, input }): Promise<KnowledgeItem[]> => {
-      const knowledgeBases = await ctx.knowledgeBaseModel.query();
+      // Look up the target agent's visibility so we can (a) apply the
+      // "public agent cannot reach caller's private rows" defensive filter
+      // in the model layer, and (b) hard-force `visibility='public'` when
+      // the agent is public — the client tab is a UX aid, not a gate.
+      const agentVisibility = await ctx.agentModel.getAgentVisibility(input.agentId);
+      const effectiveVisibility =
+        agentVisibility === 'public' ? ('public' as const) : input.visibility;
+
+      const knowledgeBases = await ctx.knowledgeBaseModel.query({
+        callerAgentVisibility: agentVisibility,
+        visibility: effectiveVisibility,
+      });
 
       const files = await ctx.fileModel.query({
+        callerAgentVisibility: agentVisibility,
         showFilesInKnowledgeBase: false,
+        visibility: effectiveVisibility,
       });
 
       const knowledge = await ctx.agentModel.getAgentAssignedKnowledge(input.agentId);
@@ -286,7 +320,9 @@ export const agentRouter = router({
             fileType: file.fileType,
             id: file.id,
             name: file.name,
+            ownerUserId: file.userId,
             type: KnowledgeType.File,
+            visibility: file.visibility as 'private' | 'public',
           })),
         ...knowledgeBases.map((knowledgeBase) => ({
           avatar: knowledgeBase.avatar,
@@ -294,314 +330,11 @@ export const agentRouter = router({
           enabled: knowledge.knowledgeBases.some((item) => item.id === knowledgeBase.id),
           id: knowledgeBase.id,
           name: knowledgeBase.name,
+          ownerUserId: knowledgeBase.userId,
           type: KnowledgeType.KnowledgeBase,
+          visibility: knowledgeBase.visibility,
         })),
       ];
-    }),
-
-  /**
-   * Get a single official agent's full config for the marketplace detail page.
-   * Public to all signed-in users — no ownership filter, but the agent must be
-   * published as `'official'` (otherwise returns null). Lets a free_user load
-   * the agent config so they can install/fork it into their own account.
-   */
-  getOfficialAgent: agentProcedure
-    .input(z.object({ agentId: z.string() }))
-    .query(async ({ input, ctx }) => {
-      return ctx.agentShareModel.getOfficialAgent(input.agentId);
-    }),
-
-  /**
-   * Paginated list of official agents for the marketplace. Visible to all
-   * signed-in users regardless of role. Optional `keyword` searches
-   * title/description. Used by the discover/marketplace page to show only
-   * admin-published agents.
-   */
-  getOfficialAgents: agentProcedure
-    .input(
-      z
-        .object({
-          keyword: z.string().optional(),
-          page: z.number().min(1).optional(),
-          pageSize: z.number().min(1).max(100).optional(),
-        })
-        .optional(),
-    )
-    .query(async ({ input, ctx }) => {
-      return ctx.agentShareModel.getOfficialAgents(input);
-    }),
-
-  /**
-   * Install an official agent into the caller's personal space.
-   * Copies the agent config (system prompt, model, plugins, etc.) but NOT the
-   * chat history. Idempotent — if the caller already installed this official
-   * agent (tracked via `params.forkedFromIdentifier`), returns the existing
-   * agent id with `alreadyInstalled: true` instead of creating a duplicate.
-   *
-   * No `agent:create` permission required: every signed-in user (including
-   * free_user) can install official agents — this is a copy of an admin-published
-   * agent, not a from-scratch creation.
-   */
-  installOfficialAgent: agentProcedure
-    .input(z.object({ agentId: z.string() }))
-    .mutation(async ({ input, ctx }) => {
-      // 1. Load the official agent source config (verifies visibility === 'official')
-      const source = await ctx.agentShareModel.getOfficialAgent(input.agentId);
-      if (!source) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Official agent not found',
-        });
-      }
-
-      // 2. Idempotency: if the caller already forked this official agent, return it
-      const existingId = await ctx.agentModel.getAgentByForkedFromIdentifier(source.id);
-      if (existingId) {
-        return { agentId: existingId, alreadyInstalled: true };
-      }
-
-      // 3. Copy the agent config into the caller's space. Chat history, files,
-      //    knowledge bases and device bindings are intentionally NOT copied —
-      //    the installed agent starts clean and is fully owned by the caller.
-      const newAgent = await ctx.agentModel.create({
-        avatar: source.avatar,
-        backgroundColor: source.backgroundColor,
-        chatConfig: source.chatConfig,
-        description: source.description,
-        fewShots: source.fewShots,
-        model: source.model,
-        openingMessage: source.openingMessage,
-        openingQuestions: source.openingQuestions,
-        params: {
-          ...(source.params ?? {}),
-          // Track provenance so re-install is idempotent and the marketplace
-          // can show "installed" state.
-          forkedFromIdentifier: source.id,
-        },
-        plugins: source.plugins,
-        provider: source.provider,
-        systemRole: source.systemRole,
-        tags: source.tags,
-        title: source.title,
-        tts: source.tts,
-      });
-
-      return { agentId: newAgent.id, alreadyInstalled: false };
-    }),
-
-  /**
-   * Publish an agent to the marketplace as an official agent.
-   * Two permission paths:
-   * - `agent:update:all` — super_admin publishes directly to `'official'`
-   *   (skips ownership gate so they can publish agents they did not create).
-   * - `agent:publish:owner` — VIP can only submit their own agents for review;
-   *   the share record is set to `'pending_review'` and a super_admin must
-   *   approve it before it becomes `'official'`.
-   */
-  publishAsOfficialAgent: agentProcedure
-    .input(z.object({ agentId: z.string() }))
-    .mutation(async ({ input, ctx }) => {
-      const rbacModel = new RbacModel(ctx.serverDB, ctx.userId);
-      const workspaceId = ctx.workspaceId ?? undefined;
-
-      const canPublishAll = await rbacModel.hasPermission('agent:update:all', {
-        workspaceId,
-      });
-      const canPublishOwner = await rbacModel.hasPermission('agent:publish:owner', {
-        workspaceId,
-      });
-
-      if (!canPublishAll && !canPublishOwner) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Missing required permission: agent:update:all | agent:publish:owner',
-        });
-      }
-
-      // VIP (owner-scoped) callers submit for review instead of publishing
-      // directly. The share record is set to 'pending_review' and surfaces on
-      // the super_admin review queue.
-      if (!canPublishAll && canPublishOwner) {
-        const share = await ctx.agentShareModel.submitForReview(input.agentId, ctx.userId);
-        if (!share) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Agent not found or not owned by the caller',
-          });
-        }
-        return { agentId: input.agentId, visibility: share.visibility };
-      }
-
-      // super_admin path: publish directly to 'official'.
-      const share = await ctx.agentShareModel.publishAsOfficial(input.agentId, {
-        skipOwnershipCheck: true,
-      });
-      if (!share) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Agent not found or not owned by the caller',
-        });
-      }
-      return { agentId: input.agentId, visibility: share.visibility };
-    }),
-
-  /**
-   * Take an official agent down from the marketplace. Resets
-   * `agent_shares.visibility` to `'private'`; the share row is kept so view
-   * counts survive a re-publish.
-   * Two permission paths:
-   * - `agent:update:all` — admin can unpublish any agent
-   * - `agent:publish:owner` — VIP can unpublish only their own agents
-   */
-  unpublishOfficialAgent: agentProcedure
-    .input(z.object({ agentId: z.string() }))
-    .mutation(async ({ input, ctx }) => {
-      const rbacModel = new RbacModel(ctx.serverDB, ctx.userId);
-      const workspaceId = ctx.workspaceId ?? undefined;
-
-      const canPublishAll = await rbacModel.hasPermission('agent:update:all', {
-        workspaceId,
-      });
-      const canPublishOwner = await rbacModel.hasPermission('agent:publish:owner', {
-        workspaceId,
-      });
-
-      if (!canPublishAll && !canPublishOwner) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Missing required permission: agent:update:all | agent:publish:owner',
-        });
-      }
-
-      if (!canPublishAll && canPublishOwner) {
-        const owned = await ctx.agentModel.getAgentConfigById(input.agentId);
-        if (!owned) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Agent not found or not owned by the caller',
-          });
-        }
-      }
-
-      const share = await ctx.agentShareModel.unpublishOfficial(input.agentId);
-      if (!share) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Agent is not currently published as official',
-        });
-      }
-      return { agentId: input.agentId, visibility: share.visibility };
-    }),
-
-  /**
-   * Check whether an agent is currently published as an official agent.
-   * Public read — any logged-in user can query this flag. Primarily used by
-   * the agent editor header to show the correct publish/unpublish action.
-   */
-  isOfficialAgent: agentProcedure
-    .input(z.object({ agentId: z.string() }))
-    .query(async ({ input, ctx }) => {
-      return { isOfficial: await ctx.agentShareModel.isOfficial(input.agentId) };
-    }),
-
-  // ==================== VIP Review Workflow ====================
-
-  /**
-   * Approve a pending-review agent — promote it to `'official'` so it
-   * appears on the marketplace. Restricted to super_admin
-   * (`agent:update:all`).
-   */
-  approveAgentReview: agentProcedure
-    .input(z.object({ agentId: z.string() }))
-    .mutation(async ({ input, ctx }) => {
-      const rbacModel = new RbacModel(ctx.serverDB, ctx.userId);
-      const workspaceId = ctx.workspaceId ?? undefined;
-
-      const canPublishAll = await rbacModel.hasPermission('agent:update:all', { workspaceId });
-      if (!canPublishAll) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Missing required permission: agent:update:all',
-        });
-      }
-
-      const share = await ctx.agentShareModel.approveReview(input.agentId);
-      if (!share) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Agent is not currently pending review',
-        });
-      }
-      return { agentId: input.agentId, visibility: share.visibility };
-    }),
-
-  /**
-   * Reject a pending-review agent — reset visibility to `'private'`. The
-   * share row is kept so view counts survive a future re-submission.
-   * Restricted to super_admin (`agent:update:all`).
-   */
-  rejectAgentReview: agentProcedure
-    .input(z.object({ agentId: z.string() }))
-    .mutation(async ({ input, ctx }) => {
-      const rbacModel = new RbacModel(ctx.serverDB, ctx.userId);
-      const workspaceId = ctx.workspaceId ?? undefined;
-
-      const canPublishAll = await rbacModel.hasPermission('agent:update:all', { workspaceId });
-      if (!canPublishAll) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Missing required permission: agent:update:all',
-        });
-      }
-
-      const share = await ctx.agentShareModel.rejectReview(input.agentId);
-      if (!share) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Agent is not currently pending review',
-        });
-      }
-      return { agentId: input.agentId, visibility: share.visibility };
-    }),
-
-  /**
-   * Paginated list of agents awaiting review. Restricted to super_admin
-   * (`agent:update:all`). Joins `agents` and `users` so the review page can
-   * render agent + submitter info without extra round-trips.
-   */
-  getPendingAgentReviews: agentProcedure
-    .input(
-      z
-        .object({
-          page: z.number().min(1).optional(),
-          pageSize: z.number().min(1).max(100).optional(),
-        })
-        .optional(),
-    )
-    .query(async ({ input, ctx }) => {
-      const rbacModel = new RbacModel(ctx.serverDB, ctx.userId);
-      const workspaceId = ctx.workspaceId ?? undefined;
-
-      const canPublishAll = await rbacModel.hasPermission('agent:update:all', { workspaceId });
-      if (!canPublishAll) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Missing required permission: agent:update:all',
-        });
-      }
-
-      return ctx.agentShareModel.getPendingReviews(input);
-    }),
-
-  /**
-   * Check whether an agent is currently awaiting review
-   * (`visibility = 'pending_review'`). Public read — used by the agent
-   * editor header to show the "pending review" state to the VIP submitter.
-   */
-  isAgentPendingReview: agentProcedure
-    .input(z.object({ agentId: z.string() }))
-    .query(async ({ input, ctx }) => {
-      return { isPendingReview: await ctx.agentShareModel.isPendingReview(input.agentId) };
     }),
 
   /**
@@ -672,6 +405,7 @@ export const agentRouter = router({
     .input(
       z.object({
         agentId: z.string(),
+        targetVisibility: z.enum(['private', 'public']).optional(),
         targetWorkspaceId: z.string().nullable(),
       }),
     )
@@ -689,19 +423,15 @@ export const agentRouter = router({
       // 2. In workspace mode, members can only transfer agents they created;
       //    workspace owners can transfer any agent
       if (ctx.workspaceId && agent.userId !== ctx.userId) {
-        const [membership] = await ctx.serverDB
-          .select({ role: workspaceMembers.role })
-          .from(workspaceMembers)
-          .where(
-            and(
-              eq(workspaceMembers.workspaceId, ctx.workspaceId),
-              eq(workspaceMembers.userId, ctx.userId),
-              isNull(workspaceMembers.deletedAt),
-            ),
-          )
-          .limit(1);
+        const canOverride = await hasWorkspaceScopedPermission({
+          action: 'AGENT_UPDATE',
+          db: ctx.serverDB,
+          scopes: ['ALL'],
+          userId: ctx.userId,
+          workspaceId: ctx.workspaceId,
+        });
 
-        if (!membership || membership.role !== 'owner') {
+        if (!canOverride) {
           throw new TRPCError({
             cause: { data: { code: TransferErrorCode.OwnerOnly } },
             code: 'FORBIDDEN',
@@ -712,19 +442,14 @@ export const agentRouter = router({
 
       // 3. Validate target workspace access (user must be member+)
       if (input.targetWorkspaceId) {
-        const [targetMembership] = await ctx.serverDB
-          .select({ role: workspaceMembers.role })
-          .from(workspaceMembers)
-          .where(
-            and(
-              eq(workspaceMembers.workspaceId, input.targetWorkspaceId),
-              eq(workspaceMembers.userId, ctx.userId),
-              isNull(workspaceMembers.deletedAt),
-            ),
-          )
-          .limit(1);
+        const canWriteTarget = await hasWorkspaceScopedPermission({
+          action: 'AGENT_CREATE',
+          db: ctx.serverDB,
+          userId: ctx.userId,
+          workspaceId: input.targetWorkspaceId,
+        });
 
-        if (!targetMembership || targetMembership.role === 'viewer') {
+        if (!canWriteTarget) {
           throw new TRPCError({
             cause: { data: { code: TransferErrorCode.TargetNoWriteAccess } },
             code: 'FORBIDDEN',
@@ -742,7 +467,12 @@ export const agentRouter = router({
         });
       }
 
-      return ctx.agentModel.transferAgent(input.agentId, input.targetWorkspaceId, ctx.userId);
+      return ctx.agentModel.transferAgent(
+        input.agentId,
+        input.targetWorkspaceId,
+        ctx.userId,
+        input.targetVisibility,
+      );
     }),
 
   updateAgentConfig: agentProcedure

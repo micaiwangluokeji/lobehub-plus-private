@@ -13,7 +13,6 @@ import {
 import { agentShares } from './agentShare';
 import { asyncTasks } from './asyncTask';
 import { chatGroups, chatGroupsAgents } from './chatGroup';
-import { chatGroupShares } from './chatGroupShare';
 import { documentHistories } from './documentHistory';
 import { documents, files, knowledgeBases } from './file';
 import { generationBatches, generations, generationTopics } from './generation';
@@ -22,12 +21,7 @@ import { chunks, documentChunks, unstructuredChunks } from './rag';
 import { sessionGroups, sessions } from './session';
 import { threads, topicDocuments, topics } from './topic';
 import { users } from './user';
-import { workspaces, workspaceMembers, workspaceInvitations } from './workspace';
-import { subscriptions } from './subscriptions';
-import { creditTransactions } from './creditTransactions';
-import { spendLogs } from './spendLogs';
-import { plans } from './paymentPlans';
-import { aiModels, aiProviders } from './aiInfra';
+import { workspaces } from './workspace';
 
 export const agentsToSessions = pgTable(
   'agents_to_sessions',
@@ -341,7 +335,6 @@ export const chatGroupsRelations = relations(chatGroups, ({ many, one }) => ({
     references: [users.id],
   }),
   agents: many(chatGroupsAgents),
-  share: one(chatGroupShares, { fields: [chatGroups.id], references: [chatGroupShares.chatGroupId] }),
 }));
 
 export const chatGroupsAgentsRelations = relations(chatGroupsAgents, ({ one }) => ({
@@ -431,90 +424,5 @@ export const agentEvalRunTopicsRelations = relations(agentEvalRunTopics, ({ one 
   testCase: one(agentEvalTestCases, {
     fields: [agentEvalRunTopics.testCaseId],
     references: [agentEvalTestCases.id],
-  }),
-}));
-
-// Workspace-related relation definitions
-export const workspaceMembersRelations = relations(workspaceMembers, ({ one }) => ({
-  user: one(users, {
-    fields: [workspaceMembers.userId],
-    references: [users.id],
-  }),
-  workspace: one(workspaces, {
-    fields: [workspaceMembers.workspaceId],
-    references: [workspaces.id],
-  }),
-}));
-
-export const workspaceInvitationsRelations = relations(workspaceInvitations, ({ one }) => ({
-  inviter: one(users, {
-    fields: [workspaceInvitations.inviterId],
-    references: [users.id],
-  }),
-  workspace: one(workspaces, {
-    fields: [workspaceInvitations.workspaceId],
-    references: [workspaces.id],
-  }),
-}));
-
-// ──────────────────────────────────────────────
-// Subscriptions-related relation definitions
-// ──────────────────────────────────────────────
-export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
-  user: one(users, {
-    fields: [subscriptions.userId],
-    references: [users.id],
-  }),
-  workspace: one(workspaces, {
-    fields: [subscriptions.workspaceId],
-    references: [workspaces.id],
-  }),
-  plan: one(plans, {
-    fields: [subscriptions.planId],
-    references: [plans.id],
-  }),
-}));
-
-// ──────────────────────────────────────────────
-// Credit Transactions-related relation definitions
-// ──────────────────────────────────────────────
-export const creditTransactionsRelations = relations(creditTransactions, ({ one }) => ({
-  user: one(users, {
-    fields: [creditTransactions.userId],
-    references: [users.id],
-  }),
-  workspace: one(workspaces, {
-    fields: [creditTransactions.workspaceId],
-    references: [workspaces.id],
-  }),
-  operator: one(users, {
-    fields: [creditTransactions.operatorId],
-    references: [users.id],
-  }),
-}));
-
-// ──────────────────────────────────────────────
-// Spend Logs-related relation definitions
-// ──────────────────────────────────────────────
-export const spendLogsRelations = relations(spendLogs, ({ one }) => ({
-  user: one(users, {
-    fields: [spendLogs.userId],
-    references: [users.id],
-  }),
-  workspace: one(workspaces, {
-    fields: [spendLogs.workspaceId],
-    references: [workspaces.id],
-  }),
-  session: one(sessions, {
-    fields: [spendLogs.sessionId],
-    references: [sessions.id],
-  }),
-  model: one(aiModels, {
-    fields: [spendLogs.modelId],
-    references: [aiModels.id],
-  }),
-  provider: one(aiProviders, {
-    fields: [spendLogs.providerId],
-    references: [aiProviders.id],
   }),
 }));

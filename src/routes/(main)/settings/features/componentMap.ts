@@ -56,18 +56,6 @@ export const componentMap = {
   [SettingsTabs.Stats]: dynamic(() => import('../stats'), {
     loading: loading('Settings > Stats'),
   }),
-  [SettingsTabs.Billing]: dynamic(() => import('@/business/client/BusinessSettingPages/Billing'), {
-    loading: loading('Settings > Billing'),
-  }),
-  [SettingsTabs.Plans]: dynamic(() => import('@/business/client/BusinessSettingPages/Plans'), {
-    loading: loading('Settings > Plans'),
-  }),
-  [SettingsTabs.Credits]: dynamic(() => import('@/business/client/BusinessSettingPages/Credits'), {
-    loading: loading('Settings > Credits'),
-  }),
-  [SettingsTabs.Referral]: dynamic(() => import('@/business/client/BusinessSettingPages/Referral'), {
-    loading: loading('Settings > Referral'),
-  }),
   [SettingsTabs.Usage]: dynamic(() => import('@/business/client/BusinessSettingPages/Usage'), {
     loading: loading('Settings > Usage'),
   }),
@@ -82,9 +70,6 @@ export const componentMap = {
   }),
   [SettingsTabs.Skill]: dynamic(() => import('../skill'), {
     loading: loading('Settings > Skill'),
-  }),
-  [SettingsTabs.Review]: dynamic(() => import('../review'), {
-    loading: loading('Settings > Review'),
   }),
 
   [SettingsTabs.Plans]: dynamic(() => import('@/business/client/BusinessSettingPages/Plans'), {

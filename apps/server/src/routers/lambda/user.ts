@@ -179,29 +179,6 @@ export const userRouter = router({
     } satisfies UserInitializationState;
   }),
 
-  /**
-   * Return the caller's RBAC permission codes (e.g. `agent:create:all`).
-   * Combines global roles (`super_admin` / `vip_user` / `free_user`) with
-   * workspace-sc roles when `workspaceId` is present. Used by the frontend
-   * `usePermission` hook to gate UI entries.
-   */
-  getUserPermissions: userProcedure.query(async ({ ctx }) => {
-    const rbacModel = new RbacModel(ctx.serverDB, ctx.userId);
-    return rbacModel.getUserPermissions({
-      workspaceId: ctx.workspaceId ?? undefined,
-    });
-  }),
-
-  /**
-   * Return the caller's active RBAC roles (global + workspace-scoped).
-   */
-  getUserRoles: userProcedure.query(async ({ ctx }) => {
-    const rbacModel = new RbacModel(ctx.serverDB, ctx.userId);
-    return rbacModel.getUserRoles({
-      workspaceId: ctx.workspaceId ?? undefined,
-    });
-  }),
-
   makeUserOnboarded: userProcedure.mutation(async ({ ctx }) => {
     return ctx.userModel.updateUser({ isOnboarded: true });
   }),

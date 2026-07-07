@@ -164,22 +164,21 @@ export default {
 
   'fork.forksCount_other': '{{count}} forks',
 
+  'fork.orgSetupRequired.memberContent':
+    "This workspace has not yet set up a Community profile, so forks from the marketplace can't be saved here. Please ask the workspace owner to set it up under Community → Workspace.",
+  'fork.orgSetupRequired.ownerContent':
+    'This workspace has not yet set up a Community profile. Set one up to fork agents from the marketplace into your workspace.',
+  'fork.orgSetupRequired.ownerOk': 'Go to setup',
+  'fork.orgSetupRequired.title': 'Community profile setup required',
+
   'fork.success': 'Forked successfully!',
 
   'fork.viewAllForks': 'View all forks',
 
-  'tab.expert': 'Experts',
-  'tab.expertTeam': 'Expert Teams',
-  'groupAgents.empty': 'No expert teams yet',
-  'groupAgents.tag': 'Group',
+  'fork.visibilityPrivate': 'Private',
+  'fork.visibilityPublic': 'Workspace',
 
-  'officialAgent.empty': 'No official agents published yet.',
-  'officialAgent.notFound': 'Agent not found.',
-  'officialAgent.use': 'Use',
-  'officialAgent.using': 'Installing...',
-  'officialAgent.installSuccess': 'Agent installed successfully!',
-  'officialAgent.alreadyInstalled': 'You have already installed this agent. Opening chat...',
-  'officialAgent.installFailed': 'Installation failed. Please try again.',
+  'groupAgents.tag': 'Group',
 
   'groupAgents.underReview': 'Under Review',
 
@@ -1109,18 +1108,6 @@ export default {
   'skills.sorts.stars': 'GitHub Stars',
 
   'skills.sorts.updatedAt': 'Recently Updated',
-
-  'publish.publishToDiscover': 'Publish to Discover',
-  'publish.updateToDiscover': 'Update on Discover',
-  'publish.submitForReview': 'Submit for Review',
-  'publish.submitUpdateReview': 'Submit Update for Review',
-  'publish.waitingForReview': 'Waiting for Review',
-  'publish.unpublish': 'Unpublish from Discover',
-  'publish.publishSuccess': 'Published to discover successfully',
-  'publish.publishFailed': 'Failed to publish to discover',
-  'publish.submitSuccess': 'Submitted for review',
-  'publish.updateSuccess': 'Updated on discover successfully',
-  'publish.unpublishSuccess': 'Unpublished from discover successfully',
 
   'tab.assistant': 'Agent',
 

@@ -7,7 +7,7 @@ import {
   BusinessMobileRoutesWithoutMainLayout,
 } from '@/business/client/BusinessMobileRoutes';
 import { mobileAgentSettingsRouteMeta } from '@/features/RouteMeta/mobileRouteMeta';
-import { verifyRouteMeta } from '@/features/Verify/routeMeta';
+import { verifyReportsRouteMeta, verifyRouteMeta } from '@/features/Verify/routeMeta';
 import { agentRouteMeta } from '@/routes/(main)/agent/features/routeMeta';
 import { shareTopicRouteMeta } from '@/routes/share/t/[id]/routeMeta';
 import { dynamicElement, dynamicLayout, ErrorBoundary, redirectElement } from '@/utils/router';
@@ -207,39 +207,6 @@ export const sharedMainAreaChildren: RouteObject[] = [
     ),
     errorElement: <ErrorBoundary />,
     path: 'community',
-  },
-
-  // Discover routes (local official agents / groups)
-  {
-    children: [
-      {
-        children: [
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/discover/agent'),
-              'Mobile > Discover > Agent List',
-            ),
-            index: true,
-          },
-        ],
-        path: 'agent',
-      },
-      {
-        element: dynamicElement(
-          () => import('@/routes/(main)/discover/agent/[agentId]'),
-          'Mobile > Discover > Agent Detail',
-        ),
-        path: 'agent/:agentId',
-      },
-      {
-        element: dynamicElement(
-          () => import('@/routes/(main)/discover/group/[groupId]'),
-          'Mobile > Discover > Group Detail',
-        ),
-        path: 'group/:groupId',
-      },
-    ],
-    path: 'discover',
   },
 
   // Task workspace routes (cross-agent)
@@ -471,6 +438,13 @@ export const mobileRoutes: RouteObject[] = [
                 ),
                 path: 'usage',
               },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/[workspaceSlug]/settings/audit-log'),
+                  'Mobile > Workspace > Settings > Audit Log',
+                ),
+                path: 'audit-log',
+              },
             ],
             element: dynamicLayout(
               () => import('@/routes/(mobile)/settings/_layout'),
@@ -566,11 +540,25 @@ export const mobileRoutes: RouteObject[] = [
     path: '/verify-im',
   },
 
-  // Standalone verification-report viewer (outside main layout)
+  // Verify report workspace — standalone master-detail (outside main layout)
   {
-    element: dynamicElement(() => import('@/routes/verify/[runId]'), 'Mobile > VerifyReport'),
+    children: [
+      {
+        element: dynamicElement(
+          () => import('@/routes/(main)/verify/empty'),
+          'Mobile > Verify Empty',
+        ),
+        index: true,
+      },
+      {
+        element: dynamicElement(() => import('@/routes/verify/[runId]'), 'Mobile > VerifyReport'),
+        handle: { meta: verifyRouteMeta },
+        path: ':runId',
+      },
+    ],
+    element: dynamicElement(() => import('@/routes/(main)/verify'), 'Mobile > Verify'),
     errorElement: <ErrorBoundary />,
-    handle: { meta: verifyRouteMeta },
-    path: '/verify/:runId',
+    handle: { meta: verifyReportsRouteMeta },
+    path: '/verify',
   },
 ];

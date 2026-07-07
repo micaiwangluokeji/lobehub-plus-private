@@ -1,23 +1,20 @@
 import { InsertChatGroupSchema } from '@lobechat/types';
 import { TRPCError } from '@trpc/server';
-import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { withScopedPermission } from '@/business/server/trpc-middlewares/rbacPermission';
 import { wsCompatProcedure } from '@/business/server/trpc-middlewares/workspaceAuth';
 import { AgentModel } from '@/database/models/agent';
 import { ChatGroupModel } from '@/database/models/chatGroup';
-import { ChatGroupShareModel } from '@/database/models/chatGroupShare';
-import { RbacModel } from '@/database/models/rbac';
 import { UserModel } from '@/database/models/user';
 import { AgentGroupRepository } from '@/database/repositories/agentGroup';
-import { workspaceMembers } from '@/database/schemas';
 import { type ChatGroupConfig } from '@/database/types/chatGroup';
 import { router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { AgentGroupService } from '@/server/services/agentGroup';
 import { EditLockService } from '@/server/services/editLock';
 import { publishResourceEvent } from '@/server/services/resourceEvents';
+import { hasWorkspaceScopedPermission } from '@/server/services/workspacePermission';
 import { TransferErrorCode } from '@/types/transferError';
 
 /**
@@ -59,7 +56,6 @@ const agentGroupProcedure = wsCompatProcedure.use(serverDatabase).use(async (opt
       agentGroupService: new AgentGroupService(ctx.serverDB, ctx.userId, wsId),
       agentModel: new AgentModel(ctx.serverDB, ctx.userId, wsId),
       chatGroupModel: new ChatGroupModel(ctx.serverDB, ctx.userId, wsId),
-      chatGroupShareModel: new ChatGroupShareModel(ctx.serverDB, ctx.userId, wsId),
       editLockService: new EditLockService(ctx.userId),
       userModel: new UserModel(ctx.serverDB, ctx.userId),
     },
@@ -312,6 +308,7 @@ export const agentGroupRouter = router({
     .input(
       z.object({
         groupId: z.string(),
+        targetVisibility: z.enum(['private', 'public']).optional(),
         targetWorkspaceId: z.string().nullable(),
       }),
     )
@@ -326,19 +323,15 @@ export const agentGroupRouter = router({
       }
 
       if (ctx.workspaceId && group.userId !== ctx.userId) {
-        const [membership] = await ctx.serverDB
-          .select({ role: workspaceMembers.role })
-          .from(workspaceMembers)
-          .where(
-            and(
-              eq(workspaceMembers.workspaceId, ctx.workspaceId),
-              eq(workspaceMembers.userId, ctx.userId),
-              isNull(workspaceMembers.deletedAt),
-            ),
-          )
-          .limit(1);
+        const canOverride = await hasWorkspaceScopedPermission({
+          action: 'AGENT_UPDATE',
+          db: ctx.serverDB,
+          scopes: ['ALL'],
+          userId: ctx.userId,
+          workspaceId: ctx.workspaceId,
+        });
 
-        if (!membership || membership.role !== 'owner') {
+        if (!canOverride) {
           throw new TRPCError({
             cause: { data: { code: TransferErrorCode.OwnerOnly } },
             code: 'FORBIDDEN',
@@ -348,19 +341,14 @@ export const agentGroupRouter = router({
       }
 
       if (input.targetWorkspaceId) {
-        const [targetMembership] = await ctx.serverDB
-          .select({ role: workspaceMembers.role })
-          .from(workspaceMembers)
-          .where(
-            and(
-              eq(workspaceMembers.workspaceId, input.targetWorkspaceId),
-              eq(workspaceMembers.userId, ctx.userId),
-              isNull(workspaceMembers.deletedAt),
-            ),
-          )
-          .limit(1);
+        const canWriteTarget = await hasWorkspaceScopedPermission({
+          action: 'AGENT_CREATE',
+          db: ctx.serverDB,
+          userId: ctx.userId,
+          workspaceId: input.targetWorkspaceId,
+        });
 
-        if (!targetMembership || targetMembership.role === 'viewer') {
+        if (!canWriteTarget) {
           throw new TRPCError({
             cause: { data: { code: TransferErrorCode.TargetNoWriteAccess } },
             code: 'FORBIDDEN',
@@ -381,6 +369,7 @@ export const agentGroupRouter = router({
         input.groupId,
         input.targetWorkspaceId,
         ctx.userId,
+        input.targetVisibility,
       );
     }),
 
@@ -398,6 +387,17 @@ export const agentGroupRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       return ctx.chatGroupModel.updateAgentInGroup(input.groupId, input.agentId, input.updates);
+    }),
+
+  /**
+   * Publish a private chat group into the workspace. One-way: once shared,
+   * other workspace members may already be using it, so we never let it slip
+   * back to `private`. Restricted to the creator's own still-private group.
+   */
+  publishGroupToWorkspace: agentGroupProcedureWrite
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      return ctx.chatGroupModel.publishToWorkspace(input.id);
     }),
 
   updateGroup: agentGroupProcedureWrite
@@ -468,306 +468,6 @@ export const agentGroupRouter = router({
         { id: input.id, type: 'chatGroup' },
         { actorId: ctx.userId, data: { holderId: null }, type: 'lock.changed' },
       );
-    }),
-
-  // ==================== Official Group (Marketplace) ====================
-
-  /**
-   * Publish a group to the marketplace as an official group.
-   * Two permission paths:
-   * - `group:publish:all` — super_admin publishes directly to `'official'`
-   *   (skips ownership gate so they can publish groups they did not create).
-   * - `group:publish:owner` — VIP can only submit their own groups for review;
-   *   the share record is set to `'pending_review'` and a super_admin must
-   *   approve it before it becomes `'official'`.
-   */
-  publishAsOfficialGroup: agentGroupProcedure
-    .input(z.object({ groupId: z.string() }))
-    .mutation(async ({ input, ctx }) => {
-      const rbacModel = new RbacModel(ctx.serverDB, ctx.userId);
-      const workspaceId = ctx.workspaceId ?? undefined;
-
-      console.log('[publishAsOfficialGroup] userId:', ctx.userId, 'groupId:', input.groupId, 'workspaceId:', workspaceId);
-
-      const canPublishAll = await rbacModel.hasPermission('group:publish:all', {
-        workspaceId,
-      });
-      const canPublishOwner = await rbacModel.hasPermission('group:publish:owner', {
-        workspaceId,
-      });
-
-      console.log('[publishAsOfficialGroup] canPublishAll:', canPublishAll, 'canPublishOwner:', canPublishOwner);
-
-      if (!canPublishAll && !canPublishOwner) {
-        console.log('[publishAsOfficialGroup] FORBIDDEN - missing permission');
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Missing required permission: group:publish:all | group:publish:owner',
-        });
-      }
-
-      // VIP (owner-scoped) callers submit for review instead of publishing
-      // directly. The share record is set to 'pending_review' and surfaces on
-      // the super_admin review queue.
-      if (!canPublishAll && canPublishOwner) {
-        const share = await ctx.chatGroupShareModel.submitForReview(input.groupId, ctx.userId);
-        if (!share) {
-          console.log('[publishAsOfficialGroup] NOT_FOUND - submitForReview returned null');
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Group not found or not owned by the caller',
-          });
-        }
-        return { groupId: input.groupId, visibility: share.visibility };
-      }
-
-      // super_admin path: publish directly to 'official'.
-      console.log('[publishAsOfficialGroup] admin path - calling publishAsOfficial with skipOwnershipCheck');
-      const share = await ctx.chatGroupShareModel.publishAsOfficial(input.groupId, {
-        skipOwnershipCheck: true,
-      });
-      console.log('[publishAsOfficialGroup] publishAsOfficial result:', share);
-      if (!share) {
-        console.log('[publishAsOfficialGroup] NOT_FOUND - publishAsOfficial returned null');
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Group not found or not owned by the caller',
-        });
-      }
-      return { groupId: input.groupId, visibility: share.visibility };
-    }),
-
-  /**
-   * Take an official group down from the marketplace. Resets
-   * `chat_group_shares.visibility` to `'private'`; the share row is kept so view
-   * counts survive a re-publish.
-   * Two permission paths:
-   * - `group:publish:all` — admin can unpublish any group
-   * - `group:publish:owner` — VIP can unpublish only their own groups
-   */
-  unpublishOfficialGroup: agentGroupProcedure
-    .input(z.object({ groupId: z.string() }))
-    .mutation(async ({ input, ctx }) => {
-      const rbacModel = new RbacModel(ctx.serverDB, ctx.userId);
-      const workspaceId = ctx.workspaceId ?? undefined;
-
-      const canPublishAll = await rbacModel.hasPermission('group:publish:all', {
-        workspaceId,
-      });
-      const canPublishOwner = await rbacModel.hasPermission('group:publish:owner', {
-        workspaceId,
-      });
-
-      if (!canPublishAll && !canPublishOwner) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Missing required permission: group:publish:all | group:publish:owner',
-        });
-      }
-
-      if (!canPublishAll && canPublishOwner) {
-        const owned = await ctx.chatGroupModel.findById(input.groupId);
-        if (!owned) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Group not found or not owned by the caller',
-          });
-        }
-      }
-
-      const share = await ctx.chatGroupShareModel.unpublishOfficial(input.groupId);
-      if (!share) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Group is not currently published as official',
-        });
-      }
-      return { groupId: input.groupId, visibility: share.visibility };
-    }),
-
-  /**
-   * Paginated list of official groups for the marketplace. Visible to all
-   * signed-in users regardless of role. Optional `keyword` searches
-   * title/description. Used by the discover/marketplace page to show only
-   * admin-published groups.
-   */
-  getOfficialGroups: agentGroupProcedure
-    .input(
-      z
-        .object({
-          keyword: z.string().optional(),
-          page: z.number().min(1).optional(),
-          pageSize: z.number().min(1).max(100).optional(),
-        })
-        .optional(),
-    )
-    .query(async ({ input, ctx }) => {
-      return ctx.chatGroupShareModel.getOfficialGroups(input);
-    }),
-
-  /**
-   * Get a single official group's full detail for the marketplace detail page.
-   * Public to all signed-in users — no ownership filter, but the group must be
-   * published as `'official'` (otherwise returns null). Lets a free_user load
-   * the group detail so they can install/fork it into their own account.
-   */
-  getOfficialGroup: agentGroupProcedure
-    .input(z.object({ groupId: z.string() }))
-    .query(async ({ input, ctx }) => {
-      return ctx.chatGroupShareModel.getOfficialGroupDetail(input.groupId);
-    }),
-
-  /**
-   * Install/fork an official group into the caller's personal space.
-   * Copies the group config and its agents but NOT the chat history.
-   * Idempotent — if the caller already installed this official group
-   * (tracked via `config.forkedFromIdentifier`), returns the existing
-   * group id with `alreadyInstalled: true` instead of creating a duplicate.
-   *
-   * No `agent:create` permission required: every signed-in user (including
-   * free_user) can install official groups — this is a copy of an admin-published
-   * group, not a from-scratch creation.
-   */
-  installOfficialGroup: agentGroupProcedure
-    .input(z.object({ groupId: z.string() }))
-    .mutation(async ({ input, ctx }) => {
-      // 1. Load the official group source config (verifies visibility === 'official')
-      const source = await ctx.chatGroupShareModel.getOfficialGroup(input.groupId);
-      if (!source) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Official group not found',
-        });
-      }
-
-      // 2. Idempotency: if the caller already forked this official group, return it
-      const existingId = await ctx.chatGroupModel.getGroupByForkedFromIdentifier(source.id);
-      if (existingId) {
-        return { groupId: existingId, alreadyInstalled: true };
-      }
-
-      // 3. Fork the group and its agents to the caller's space.
-      //    Chat history is intentionally NOT copied — the installed group starts
-      //    clean and is fully owned by the caller.
-      const result = await ctx.agentGroupRepo.copyFromOfficial(
-        input.groupId,
-        ctx.workspaceId ?? null,
-        ctx.userId,
-        source.id,
-      );
-
-      return { groupId: result?.groupId, alreadyInstalled: false };
-    }),
-
-  /**
-   * Check whether a group is currently published as an official group.
-   * Public read — any logged-in user can query this flag. Primarily used by
-   * the group editor header to show the correct publish/unpublish action.
-   */
-  isOfficialGroup: agentGroupProcedure
-    .input(z.object({ groupId: z.string() }))
-    .query(async ({ input, ctx }) => {
-      return { isOfficial: await ctx.chatGroupShareModel.isOfficial(input.groupId) };
-    }),
-
-  // ==================== VIP Review Workflow ====================
-
-  /**
-   * Approve a pending-review group — promote it to `'official'` so it
-   * appears on the marketplace. Restricted to super_admin
-   * (`group:publish:all`).
-   */
-  approveGroupReview: agentGroupProcedure
-    .input(z.object({ groupId: z.string() }))
-    .mutation(async ({ input, ctx }) => {
-      const rbacModel = new RbacModel(ctx.serverDB, ctx.userId);
-      const workspaceId = ctx.workspaceId ?? undefined;
-
-      const canPublishAll = await rbacModel.hasPermission('group:publish:all', { workspaceId });
-      if (!canPublishAll) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Missing required permission: group:publish:all',
-        });
-      }
-
-      const share = await ctx.chatGroupShareModel.approveReview(input.groupId);
-      if (!share) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Group is not currently pending review',
-        });
-      }
-      return { groupId: input.groupId, visibility: share.visibility };
-    }),
-
-  /**
-   * Reject a pending-review group — reset visibility to `'private'`. The
-   * share row is kept so view counts survive a future re-submission.
-   * Restricted to super_admin (`group:publish:all`).
-   */
-  rejectGroupReview: agentGroupProcedure
-    .input(z.object({ groupId: z.string() }))
-    .mutation(async ({ input, ctx }) => {
-      const rbacModel = new RbacModel(ctx.serverDB, ctx.userId);
-      const workspaceId = ctx.workspaceId ?? undefined;
-
-      const canPublishAll = await rbacModel.hasPermission('group:publish:all', { workspaceId });
-      if (!canPublishAll) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Missing required permission: group:publish:all',
-        });
-      }
-
-      const share = await ctx.chatGroupShareModel.rejectReview(input.groupId);
-      if (!share) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Group is not currently pending review',
-        });
-      }
-      return { groupId: input.groupId, visibility: share.visibility };
-    }),
-
-  /**
-   * Paginated list of groups awaiting review. Restricted to super_admin
-   * (`group:publish:all`). Joins `chat_groups` and `users` so the review
-   * page can render group + submitter info without extra round-trips.
-   */
-  getPendingGroupReviews: agentGroupProcedure
-    .input(
-      z
-        .object({
-          page: z.number().min(1).optional(),
-          pageSize: z.number().min(1).max(100).optional(),
-        })
-        .optional(),
-    )
-    .query(async ({ input, ctx }) => {
-      const rbacModel = new RbacModel(ctx.serverDB, ctx.userId);
-      const workspaceId = ctx.workspaceId ?? undefined;
-
-      const canPublishAll = await rbacModel.hasPermission('group:publish:all', { workspaceId });
-      if (!canPublishAll) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Missing required permission: group:publish:all',
-        });
-      }
-
-      return ctx.chatGroupShareModel.getPendingReviews(input);
-    }),
-
-  /**
-   * Check whether a group is currently awaiting review
-   * (`visibility = 'pending_review'`). Public read — used by the group
-   * editor header to show the "pending review" state to the VIP submitter.
-   */
-  isGroupPendingReview: agentGroupProcedure
-    .input(z.object({ groupId: z.string() }))
-    .query(async ({ input, ctx }) => {
-      return { isPendingReview: await ctx.chatGroupShareModel.isPendingReview(input.groupId) };
     }),
 });
 

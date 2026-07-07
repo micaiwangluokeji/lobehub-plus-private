@@ -9,7 +9,9 @@ import {
 import { and, eq, inArray } from 'drizzle-orm';
 
 import { permissions, rolePermissions, roles, userRoles } from '../schemas/rbac';
-import type { LobeChatDatabase } from '../type';
+import type { LobeChatDatabase, Transaction } from '../type';
+
+type WorkspaceRoleMutationDb = LobeChatDatabase | Transaction;
 
 /**
  * Map a permission code (e.g. `agent:create`) to the category column —
@@ -37,28 +39,18 @@ const codeToName = (code: string): string => {
 };
 
 /**
- * Ensure every permission code referenced by the built-in roles exists in
- * `rbac_permissions`. Idempotent — re-runs are safe because we only insert
- * codes that are missing.
- *
- * Accepts an optional `additionalCodes` list so callers outside the workspace
- * seeding flow (e.g. `seedSystemRoles`) can ensure their own permission codes
- * exist too. Permissions live in the global table (no workspaceId) — only
- * the *roles* are workspace-scoped.
+ * Ensure every permission code referenced by the three built-in workspace
+ * roles exists in `rbac_permissions`. Idempotent — re-runs are safe because
+ * we only insert codes that are missing.
  *
  * Returns a map from `code` to permission `id` for use by the role-permission
- * linkage step.
+ * linkage step. Permissions live in the global table (no workspaceId) — only
+ * the *roles* are workspace-scoped.
  */
-export const ensurePermissionsExist = async (
-  db: LobeChatDatabase,
-  additionalCodes?: readonly string[],
-): Promise<Map<string, string>> => {
+const ensurePermissionsExist = async (db: LobeChatDatabase): Promise<Map<string, string>> => {
   const requiredCodes = new Set<string>();
   for (const codes of Object.values(WORKSPACE_ROLE_PERMISSIONS)) {
     for (const code of codes) requiredCodes.add(code);
-  }
-  if (additionalCodes) {
-    for (const code of additionalCodes) requiredCodes.add(code);
   }
   const codeList = [...requiredCodes];
 
@@ -198,7 +190,7 @@ export const seedWorkspaceRoles = async (
  *   matching `rbac_user_roles` row
  */
 export const assignWorkspaceRoleToUser = async (
-  db: LobeChatDatabase,
+  db: WorkspaceRoleMutationDb,
   params: {
     roleName: WorkspaceSystemRoleName;
     userId: string;
@@ -228,7 +220,7 @@ export const assignWorkspaceRoleToUser = async (
  * by a fresh `assignWorkspaceRoleToUser` call).
  */
 export const revokeWorkspaceRolesForUser = async (
-  db: LobeChatDatabase,
+  db: WorkspaceRoleMutationDb,
   params: { userId: string; workspaceId: string },
 ): Promise<void> => {
   await db

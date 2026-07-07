@@ -1,9 +1,16 @@
 import { isDesktop } from '@lobechat/const';
-import { ActionIcon, DropdownMenu, Flexbox, Icon, Tag } from '@lobehub/ui';
+import { ActionIcon, DropdownMenu, Flexbox, Icon } from '@lobehub/ui';
 import { confirmModal, type ModalInstance } from '@lobehub/ui/base-ui';
 import isEqual from 'fast-deep-equal';
 import type { TFunction } from 'i18next';
-import { BotMessageSquareIcon, Download, MoreHorizontal, Rocket, Settings2Icon, Trash } from 'lucide-react';
+import {
+  BarChart3,
+  BotMessageSquareIcon,
+  Download,
+  MoreHorizontal,
+  Settings2Icon,
+  Trash,
+} from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -11,13 +18,11 @@ import { useAgentTransferMenuItem } from '@/business/client/hooks/useAgentTransf
 import { useBusinessAgentImportMenuItem } from '@/business/client/hooks/useBusinessAgentImportMenuItem';
 import { message } from '@/components/AntdStaticMethods';
 import { DESKTOP_HEADER_ICON_SMALL_SIZE } from '@/const/layoutTokens';
+import AgentBreadcrumb from '@/features/AgentBreadcrumb';
 import NavHeader from '@/features/NavHeader';
 import ToggleRightPanelButton from '@/features/RightPanel/ToggleRightPanelButton';
 import { useWorkspaceAwareNavigate } from '@/features/Workspace/useWorkspaceAwareNavigate';
 import { usePermission } from '@/hooks/usePermission';
-import { useClientDataSWR } from '@/libs/swr';
-import { officialAgentKeys } from '@/libs/swr/keys';
-import { officialAgentService } from '@/services/officialAgent';
 import { useAgentStore } from '@/store/agent';
 import { agentSelectors } from '@/store/agent/selectors';
 import { useGlobalStore } from '@/store/global';
@@ -32,7 +37,10 @@ import AgentStatusTag from './AgentStatusTag';
 import AgentVersionReviewTag from './AgentVersionReviewTag';
 import AutoSaveHint from './AutoSaveHint';
 
-type HeaderTranslation = TFunction<readonly ['setting', 'chat', 'file', 'common'], undefined>;
+type HeaderTranslation = TFunction<
+  readonly ['setting', 'chat', 'file', 'common', 'spend'],
+  undefined
+>;
 
 const buildAgentProfileMarkdown = (params: {
   description?: string;
@@ -84,7 +92,7 @@ const buildAgentProfileMarkdown = (params: {
 };
 
 const Header = memo(() => {
-  const { t } = useTranslation(['setting', 'chat', 'file', 'common', 'discover']);
+  const { t } = useTranslation(['setting', 'chat', 'file', 'common', 'spend']);
   const navigate = useWorkspaceAwareNavigate();
 
   const meta = useAgentStore(agentSelectors.currentAgentMeta, isEqual);
@@ -102,64 +110,6 @@ const Header = memo(() => {
   const lockedByOther = useProfileStore(profileSelectors.lockedByOther);
   const lockPending = useProfileStore(profileSelectors.lockPending);
   const { allowed: canEdit } = usePermission('edit_own_content');
-  const { allowed: canPublish, hasPermission } = usePermission('publish_agent');
-  // super_admin holds `agent:update:all`; VIP holds `agent:publish:owner`.
-  const isAdmin = hasPermission('agent:update:all');
-  const isVIP = hasPermission('agent:publish:owner');
-
-  const { data: isOfficial, mutate: refreshIsOfficial } = useClientDataSWR(
-    canPublish && activeAgentId ? officialAgentKeys.isOfficial(activeAgentId) : null,
-    () => officialAgentService.isOfficialAgent(activeAgentId!),
-  );
-
-  const { data: isPendingReview, mutate: refreshIsPendingReview } = useClientDataSWR(
-    canPublish && activeAgentId ? officialAgentKeys.isPendingReview(activeAgentId) : null,
-    () => officialAgentService.isPendingReview(activeAgentId!),
-  );
-
-  const handlePublishAsOfficial = useCallback(() => {
-    if (!activeAgentId) return;
-    confirmModal({
-      okButtonProps: { type: 'primary' },
-      onOk: async () => {
-        try {
-          await officialAgentService.publishAsOfficialAgent(activeAgentId);
-          await refreshIsOfficial();
-          await refreshIsPendingReview();
-          // Admins publish/update directly; VIPs go through review.
-          const successKey = isAdmin
-            ? isOfficial
-              ? 'publish.updateSuccess'
-              : 'publish.publishSuccess'
-            : 'publish.submitSuccess';
-          message.success(t(successKey, { ns: 'discover' }));
-        } catch (error) {
-          console.error('Failed to publish agent as official:', error);
-          message.error(t('publish.publishFailed', { ns: 'discover' }));
-        }
-      },
-      title: t('settingAgent.discover.publishConfirm', { ns: 'setting' }),
-    });
-  }, [activeAgentId, refreshIsOfficial, refreshIsPendingReview, isAdmin, isOfficial, t]);
-
-  const handleUnpublishOfficial = useCallback(() => {
-    if (!activeAgentId) return;
-    confirmModal({
-      okButtonProps: { danger: true },
-      onOk: async () => {
-        try {
-          await officialAgentService.unpublishOfficialAgent(activeAgentId);
-          await refreshIsOfficial();
-          await refreshIsPendingReview();
-          message.success(t('publish.unpublishSuccess', { ns: 'discover' }));
-        } catch (error) {
-          console.error('Failed to unpublish official agent:', error);
-          message.error(t('settingAgent.discover.unpublishFailed', { ns: 'setting' }));
-        }
-      },
-      title: t('settingAgent.discover.unpublishConfirm', { ns: 'setting' }),
-    });
-  }, [activeAgentId, refreshIsOfficial, refreshIsPendingReview, t]);
 
   const handleDelete = useCallback(() => {
     if (!canEdit || !activeAgentId) return;
@@ -236,64 +186,6 @@ const Header = memo(() => {
   const menuItems = useMemo(() => {
     const businessTransferMenuItems = transferMenuItems ?? [];
 
-    // Build publish/submit menu items based on role and current state.
-    // - super_admin (agent:update:all): publish → or update + unpublish
-    // - VIP (agent:publish:owner): submit for review → or submit update for review + unpublish
-    const publishMenuItems: any[] = [];
-    if (canPublish) {
-      if (isAdmin) {
-        if (isOfficial) {
-          publishMenuItems.push(
-            {
-              icon: <Icon icon={Rocket} />,
-              key: 'update-official',
-              label: t('publish.updateToDiscover', { ns: 'discover' }),
-              onClick: handlePublishAsOfficial,
-            },
-            {
-              danger: true,
-              icon: <Icon icon={Rocket} />,
-              key: 'unpublish-official',
-              label: t('publish.unpublish', { ns: 'discover' }),
-              onClick: handleUnpublishOfficial,
-            },
-          );
-        } else {
-          publishMenuItems.push({
-            icon: <Icon icon={Rocket} />,
-            key: 'publish-official',
-            label: t('publish.publishToDiscover', { ns: 'discover' }),
-            onClick: handlePublishAsOfficial,
-          });
-        }
-      } else if (isVIP) {
-        if (isOfficial) {
-          publishMenuItems.push(
-            {
-              icon: <Icon icon={Rocket} />,
-              key: 'submit-update-review',
-              label: t('publish.submitUpdateReview', { ns: 'discover' }),
-              onClick: handlePublishAsOfficial,
-            },
-            {
-              danger: true,
-              icon: <Icon icon={Rocket} />,
-              key: 'unpublish-official',
-              label: t('publish.unpublish', { ns: 'discover' }),
-              onClick: handleUnpublishOfficial,
-            },
-          );
-        } else {
-          publishMenuItems.push({
-            icon: <Icon icon={Rocket} />,
-            key: 'submit-for-review',
-            label: t('publish.submitForReview', { ns: 'discover' }),
-            onClick: handlePublishAsOfficial,
-          });
-        }
-      }
-    }
-
     return [
       {
         icon: <Icon icon={Settings2Icon} />,
@@ -304,9 +196,15 @@ const Header = memo(() => {
           settingsModalRef.current = openAgentSettingsModal();
         },
       },
+      {
+        icon: <Icon icon={BarChart3} />,
+        key: 'usage-stats',
+        label: t('usageStats.entry', { ns: 'spend' }),
+        onClick: () => {
+          if (activeAgentId) navigate(`/agent/${activeAgentId}/stats`);
+        },
+      },
       { type: 'divider' as const },
-      ...publishMenuItems,
-      publishMenuItems.length > 0 ? { type: 'divider' as const } : null,
       {
         children: [
           {
@@ -334,16 +232,11 @@ const Header = memo(() => {
       },
     ].filter(Boolean);
   }, [
+    activeAgentId,
     canEdit,
-    canPublish,
     handleExportMarkdown,
     handleDelete,
-    handlePublishAsOfficial,
-    handleUnpublishOfficial,
-    isAdmin,
-    isOfficial,
-    isPendingReview,
-    isVIP,
+    navigate,
     t,
     importMenuItem,
     transferMenuItems,
@@ -351,17 +244,16 @@ const Header = memo(() => {
 
   return (
     <NavHeader
+      styles={{ left: { paddingInlineStart: 24 } }}
       left={
         <Flexbox horizontal align={'center'} gap={8}>
+          {activeAgentId && (
+            <AgentBreadcrumb agentId={activeAgentId} title={t('tab.profile', { ns: 'chat' })} />
+          )}
           <AutoSaveHint />
           <AgentStatusTag />
           <AgentVersionReviewTag />
           <AgentForkTag />
-          {isPendingReview && (
-            <Tag bordered={false} color="orange">
-              {t('publish.waitingForReview', { ns: 'discover' })}
-            </Tag>
-          )}
         </Flexbox>
       }
       right={

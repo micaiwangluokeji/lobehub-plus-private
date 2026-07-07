@@ -17,7 +17,7 @@ const BrandTextLoading = ({ debugId }: BrandTextLoadingProps) => {
       </div>
     );
 
-  const showDebug = false;
+  const showDebug = process.env.NODE_ENV === 'development' && debugId;
 
   return (
     <div className={styles.container}>

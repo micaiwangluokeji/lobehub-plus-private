@@ -1,45 +1,28 @@
-import { useNavigate } from 'react-router';
-
-import { useWorkspaceStore } from '@/store/workspace';
-
 export interface SwitchWorkspaceActions {
   switchToPersonal: () => Promise<void>;
   switchWorkspace: (id: string) => Promise<void>;
 }
 
-export const useSwitchWorkspace = (): SwitchWorkspaceActions => {
-  const navigate = useNavigate();
-  const setActiveWorkspace = useWorkspaceStore((s) => s.setActiveWorkspace);
-  const clearActiveWorkspace = useWorkspaceStore((s) => s.clearActiveWorkspace);
-  const workspaces = useWorkspaceStore((s) => s.workspaces);
+const noop = async (): Promise<void> => {};
 
-  const switchWorkspace = async (id: string) => {
-    setActiveWorkspace(id);
-    const workspace = workspaces.find((w) => w.id === id);
-    if (workspace) {
-      navigate(`/${workspace.slug}/`);
-    }
-  };
+/**
+ * Workspace switch invoked from imperative call sites that represent an
+ * explicit user choice (e.g. switcher click, wizard landing, accept-invite,
+ * post-leave redirect). Implementations may attach side effects appropriate
+ * to the user-intent semantics.
+ */
+export const useSwitchWorkspace = (): SwitchWorkspaceActions => ({
+  switchToPersonal: noop,
+  switchWorkspace: noop,
+});
 
-  const switchToPersonal = async () => {
-    clearActiveWorkspace();
-    navigate('/');
-  };
-
-  return { switchToPersonal, switchWorkspace };
-};
-
-export const useSilentSwitchWorkspace = (): SwitchWorkspaceActions => {
-  const setActiveWorkspace = useWorkspaceStore((s) => s.setActiveWorkspace);
-  const clearActiveWorkspace = useWorkspaceStore((s) => s.clearActiveWorkspace);
-
-  const switchWorkspace = async (id: string) => {
-    setActiveWorkspace(id);
-  };
-
-  const switchToPersonal = async () => {
-    clearActiveWorkspace();
-  };
-
-  return { switchToPersonal, switchWorkspace };
-};
+/**
+ * Workspace switch invoked from passive reconciliation sources (e.g. URL
+ * sync) where the active workspace is being aligned with external state
+ * rather than chosen by the user. Implementations must not attach
+ * user-intent side effects.
+ */
+export const useSilentSwitchWorkspace = (): SwitchWorkspaceActions => ({
+  switchToPersonal: noop,
+  switchWorkspace: noop,
+});

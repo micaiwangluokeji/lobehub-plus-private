@@ -2,7 +2,6 @@ import type { WorkspaceSystemRoleName } from '@lobechat/const/rbac';
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 
 import type { LobeChatDatabase } from '@/database/type';
-import { users } from '../schemas/user';
 
 import type { RoleItem } from '../schemas/rbac';
 import { permissions, rolePermissions, roles, userRoles } from '../schemas/rbac';
@@ -69,16 +68,6 @@ export class RbacModel {
     this.db = db;
   }
 
-  /** ★ 检查用户是否为 root 管理员（isRoot 短路，类似 LifeOS 设计） */
-  private async isRootUser(): Promise<boolean> {
-    const [user] = await this.db
-      .select({ isRoot: users.isRoot })
-      .from(users)
-      .where(eq(users.id, this.userId))
-      .limit(1);
-    return user?.isRoot ?? false;
-  }
-
   /**
    * Get all permissions for a specific user. Accepts either a plain `userId`
    * string (legacy global-scope check) or `{ userId?, workspaceId? }`
@@ -86,16 +75,6 @@ export class RbacModel {
    * scope suffix as stored in `rbac_permissions.code`.
    */
   getUserPermissions = async (arg?: string | RbacScopeOptions): Promise<string[]> => {
-    // ★ isRoot 短路 — return ALL active permission codes so the frontend
-    //    usePermission hook sees full access and unlocks all UI controls.
-    if (await this.isRootUser()) {
-      const allPerms = await this.db
-        .select({ code: permissions.code })
-        .from(permissions)
-        .where(eq(permissions.isActive, true));
-      return allPerms.map(p => p.code);
-    }
-
     const opts = normalizeScope(arg);
     const targetUserId = opts.userId || this.userId;
 
@@ -130,19 +109,6 @@ export class RbacModel {
   getUserPermissionDetails = async (
     arg?: string | RbacScopeOptions,
   ): Promise<UserPermissionInfo[]> => {
-    // ★ isRoot 短路 — return ALL active permission details.
-    if (await this.isRootUser()) {
-      return this.db
-        .select({
-          category: permissions.category,
-          permissionCode: permissions.code,
-          permissionName: permissions.name,
-          roleName: sql`'super_admin'`.as('roleName'),
-        })
-        .from(permissions)
-        .where(eq(permissions.isActive, true));
-    }
-
     const opts = normalizeScope(arg);
     const targetUserId = opts.userId || this.userId;
 
@@ -178,9 +144,6 @@ export class RbacModel {
     permissionCode: string,
     arg?: string | RbacScopeOptions,
   ): Promise<boolean> => {
-    // ★ isRoot 短路
-    if (await this.isRootUser()) return true;
-
     const opts = normalizeScope(arg);
     const targetUserId = opts.userId || this.userId;
 
@@ -212,9 +175,6 @@ export class RbacModel {
     permissionCodes: string[],
     arg?: string | RbacScopeOptions,
   ): Promise<boolean> => {
-    // ★ isRoot 短路
-    if (await this.isRootUser()) return true;
-
     if (permissionCodes.length === 0) return false;
 
     const opts = normalizeScope(arg);
@@ -248,9 +208,6 @@ export class RbacModel {
     permissionCodes: string[],
     arg?: string | RbacScopeOptions,
   ): Promise<boolean> => {
-    // ★ isRoot 短路
-    if (await this.isRootUser()) return true;
-
     if (permissionCodes.length === 0) return true;
 
     const checks = await Promise.all(permissionCodes.map((code) => this.hasPermission(code, arg)));

@@ -1,6 +1,5 @@
 import agent from './agent';
 import agentGroup from './agentGroup';
-import admin from './admin';
 import auth from './auth';
 import authError from './authError';
 import changelog from './changelog';
@@ -52,7 +51,6 @@ import video from './video';
 import welcome from './welcome';
 
 const resources = {
-  admin,
   agent,
   agentGroup,
   auth,

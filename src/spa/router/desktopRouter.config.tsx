@@ -19,9 +19,9 @@ import { agentDocumentRouteMeta } from '@/features/AgentDocumentPage/routeMeta';
 import { taskRouteMeta, tasksRouteMeta } from '@/features/AgentTasks/routeMeta';
 import { fleetRouteMeta } from '@/features/Fleet/routeMeta';
 import { pageRouteMeta } from '@/features/Pages/routeMeta';
-import { verifyRouteMeta } from '@/features/Verify/routeMeta';
+import { verifyReportsRouteMeta, verifyRouteMeta } from '@/features/Verify/routeMeta';
 import { workspaceHomeRouteMeta } from '@/features/Workspace/routeMeta';
-import { agentRouteMeta } from '@/routes/(main)/agent/features/routeMeta';
+import { agentRouteMeta, topicsRouteMeta } from '@/routes/(main)/agent/features/routeMeta';
 import { groupRouteMeta } from '@/routes/(main)/group/features/routeMeta';
 import { settingsRouteMeta } from '@/routes/(main)/settings/features/routeMeta';
 import { shareTopicRouteMeta } from '@/routes/share/t/[id]/routeMeta';
@@ -76,6 +76,13 @@ export const sharedMainAreaChildren: RouteObject[] = [
             children: [
               {
                 element: dynamicElement(
+                  () => import('@/routes/(main)/agent/docs'),
+                  'Desktop > Chat > DocumentsIndex',
+                ),
+                index: true,
+              },
+              {
+                element: dynamicElement(
                   () => import('@/routes/(main)/agent/docs/[docId]'),
                   'Desktop > Chat > Document',
                 ),
@@ -108,7 +115,15 @@ export const sharedMainAreaChildren: RouteObject[] = [
               () => import('@/routes/(main)/agent/topics'),
               'Desktop > Chat > Topics',
             ),
+            handle: { meta: topicsRouteMeta },
             path: 'topics',
+          },
+          {
+            element: dynamicElement(
+              () => import('@/routes/(main)/agent/stats'),
+              'Desktop > Chat > Stats',
+            ),
+            path: 'stats',
           },
           {
             element: dynamicElement(
@@ -381,42 +396,6 @@ export const sharedMainAreaChildren: RouteObject[] = [
     ),
     errorElement: <ErrorBoundary />,
     path: 'community',
-  },
-
-  // Discover routes (local official agents / groups)
-  {
-    children: [
-      {
-        children: [
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/discover/agent'),
-              'Desktop > Discover > Agent List',
-            ),
-            handle: {
-              meta: routeMeta({ icon: ShapesIcon, titleKey: 'navigation.discover' }),
-            },
-            index: true,
-          },
-        ],
-        path: 'agent',
-      },
-      {
-        element: dynamicElement(
-          () => import('@/routes/(main)/discover/agent/[agentId]'),
-          'Desktop > Discover > Agent Detail',
-        ),
-        path: 'agent/:agentId',
-      },
-      {
-        element: dynamicElement(
-          () => import('@/routes/(main)/discover/group/[groupId]'),
-          'Desktop > Discover > Group Detail',
-        ),
-        path: 'group/:groupId',
-      },
-    ],
-    path: 'discover',
   },
 
   // Resource routes
@@ -798,229 +777,6 @@ export const desktopRoutes: RouteObject[] = [
         path: 'settings',
       },
 
-      // Admin routes — personal-only (super_admin), never mirrored under /:workspaceSlug.
-      // Must come AFTER all other reserved root paths to avoid shadowing.
-      {
-        children: [
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin'),
-              'Desktop > Admin > Dashboard',
-            ),
-            index: true,
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/users'),
-              'Desktop > Admin > Users',
-            ),
-            path: 'users',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/users/[id]'),
-              'Desktop > Admin > User Detail',
-            ),
-            path: 'users/:id',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/roles'),
-              'Desktop > Admin > Roles',
-            ),
-            path: 'roles',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/roles/[id]'),
-              'Desktop > Admin > Role Detail',
-            ),
-            path: 'roles/:id',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/permissions'),
-              'Desktop > Admin > Permissions',
-            ),
-            path: 'permissions',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/workspaces'),
-              'Desktop > Admin > Workspaces',
-            ),
-            path: 'workspaces',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/agents'),
-              'Desktop > Admin > Agents',
-            ),
-            path: 'agents',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/models'),
-              'Desktop > Admin > Models',
-            ),
-            path: 'models',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/providers'),
-              'Desktop > Admin > Providers',
-            ),
-            path: 'providers',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/providers/[id]'),
-              'Desktop > Admin > Provider Detail',
-            ),
-            path: 'providers/:id',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/messages'),
-              'Desktop > Admin > Messages',
-            ),
-            path: 'messages',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/files'),
-              'Desktop > Admin > Files',
-            ),
-            path: 'files',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/knowledge-bases'),
-              'Desktop > Admin > Knowledge Bases',
-            ),
-            path: 'knowledge-bases',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/api-keys'),
-              'Desktop > Admin > API Keys',
-            ),
-            path: 'api-keys',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/audit-logs'),
-              'Desktop > Admin > Audit Logs',
-            ),
-            path: 'audit-logs',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/settings'),
-              'Desktop > Admin > Settings',
-            ),
-            path: 'settings',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/payment'),
-              'Desktop > Admin > Payment',
-            ),
-            path: 'payment',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/plans'),
-              'Desktop > Admin > Plans',
-            ),
-            path: 'plans',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/membership'),
-              'Desktop > Admin > Membership',
-            ),
-            path: 'membership',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/dict-configs'),
-              'Desktop > Admin > Dict Configs',
-            ),
-            path: 'dict-configs',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/orders'),
-              'Desktop > Admin > Orders',
-            ),
-            path: 'orders',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/refund-requests'),
-              'Desktop > Admin > Refund Requests',
-            ),
-            path: 'refund-requests',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/login-config'),
-              'Desktop > Admin > Login Config',
-            ),
-            path: 'login-config',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/decoration'),
-              'Desktop > Admin > Decoration',
-            ),
-            path: 'decoration',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/revenue'),
-              'Desktop > Admin > Revenue',
-            ),
-            path: 'revenue',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/subscriptions'),
-              'Desktop > Admin > Subscriptions',
-            ),
-            path: 'subscriptions',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/credit-transactions'),
-              'Desktop > Admin > Credit Transactions',
-            ),
-            path: 'credit-transactions',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/spend'),
-              'Desktop > Admin > Spend',
-            ),
-            path: 'spend',
-          },
-          {
-            element: dynamicElement(
-              () => import('@/routes/(main)/admin/agreement'),
-              'Desktop > Admin > Agreement',
-            ),
-            path: 'agreement',
-          },
-        ],
-        element: dynamicElement(
-          () => import('@/routes/(main)/admin/_layout'),
-          'Desktop > Admin > Layout',
-        ),
-        errorElement: <ErrorBoundary />,
-        path: 'admin',
-      },
-
       // Workspace slug routes — `/:workspaceSlug/*` mirrors the shared main area.
       // Must come AFTER all reserved root paths so they don't shadow e.g. /agent.
       {
@@ -1133,6 +889,13 @@ export const desktopRoutes: RouteObject[] = [
                   },
                   {
                     element: dynamicElement(
+                      () => import('@/routes/(main)/[workspaceSlug]/settings/audit-log'),
+                      'Desktop > Workspace > Settings > Audit Log',
+                    ),
+                    path: 'audit-log',
+                  },
+                  {
+                    element: dynamicElement(
                       () => import('@/routes/(main)/[workspaceSlug]/settings/storage'),
                       'Desktop > Workspace > Settings > Storage',
                     ),
@@ -1166,8 +929,6 @@ export const desktopRoutes: RouteObject[] = [
               { element: redirectElement('../settings/plans'), path: 'plans' },
               { element: redirectElement('../settings/usage'), path: 'usage' },
               { element: redirectElement('../settings/credits'), path: 'credits' },
-              { element: redirectElement('../settings/referral'), path: 'referral' },
-              { element: redirectElement('../settings/history'), path: 'history' },
               { element: redirectElement('../settings/billing'), path: 'billing' },
             ],
             path: 'billing',
@@ -1236,12 +997,26 @@ export const desktopRoutes: RouteObject[] = [
     path: '/verify-im',
   },
 
-  // Standalone verification-report viewer (outside main layout)
+  // Verify report workspace — standalone master-detail (outside main layout)
   {
-    element: dynamicElement(() => import('@/routes/verify/[runId]'), 'Desktop > VerifyReport'),
+    children: [
+      {
+        element: dynamicElement(
+          () => import('@/routes/(main)/verify/empty'),
+          'Desktop > Verify Empty',
+        ),
+        index: true,
+      },
+      {
+        element: dynamicElement(() => import('@/routes/verify/[runId]'), 'Desktop > VerifyReport'),
+        handle: { meta: verifyRouteMeta },
+        path: ':runId',
+      },
+    ],
+    element: dynamicElement(() => import('@/routes/(main)/verify'), 'Desktop > Verify'),
     errorElement: <ErrorBoundary />,
-    handle: { meta: verifyRouteMeta },
-    path: '/verify/:runId',
+    handle: { meta: verifyReportsRouteMeta },
+    path: '/verify',
   },
 
   // Devtools route (outside main layout, dev-only)

@@ -24,10 +24,7 @@ export const agentShares = pgTable(
       .notNull()
       .references(() => agents.id, { onDelete: 'cascade' }),
 
-    // 'private' (default, owner-only) | 'link' (anyone with the share link)
-    // | 'official' (published to the marketplace by an admin, visible to all users)
-    // | 'pending_review' (VIP-submitted, awaiting super_admin approval)
-    visibility: text('visibility').default('private').notNull(),
+    visibility: text('visibility').default('private').notNull(), // 'private' | 'link'
 
     shareConfig: jsonb('share_config').$type<AgentShareConfig>(),
 

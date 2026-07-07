@@ -305,21 +305,15 @@ export default defineConfig({
       : isAuth
         ? Number(process.env.AUTH_SPA_PORT) || 3013
         : Number(process.env.SPA_PORT) || 9876,
+    // The dev orchestrator (scripts/devStartupSequence.mts) pre-resolves a free
+    // port and injects it via env; never silently drift to another port, since
+    // downstream consumers locate this server through that env contract.
+    strictPort: true,
     proxy: {
       '/api': `http://localhost:${process.env.PORT || 3010}`,
       '/oidc': `http://localhost:${process.env.PORT || 3010}`,
       '/trpc': `http://localhost:${process.env.PORT || 3010}`,
       '/webapi': `http://localhost:${process.env.PORT || 3010}`,
-      // Auth pages — proxy to local Next.js so users can sign in locally.
-      '/signin': `http://localhost:${process.env.PORT || 3010}`,
-      '/signup': `http://localhost:${process.env.PORT || 3010}`,
-      '/verify-email': `http://localhost:${process.env.PORT || 3010}`,
-      '/reset-password': `http://localhost:${process.env.PORT || 3010}`,
-      '/auth-error': `http://localhost:${process.env.PORT || 3010}`,
-      '/oauth': `http://localhost:${process.env.PORT || 3010}`,
-      '/market-auth-callback': `http://localhost:${process.env.PORT || 3010}`,
-      '/verify-im': `http://localhost:${process.env.PORT || 3010}`,
-      '/verify/': `http://localhost:${process.env.PORT || 3010}`,
     },
     warmup: {
       clientFiles: [

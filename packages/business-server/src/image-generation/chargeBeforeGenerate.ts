@@ -1,12 +1,11 @@
-import { TRPCError } from '@trpc/server';
-
-import { CreditTransactionsModel } from '@/database/models/creditTransactions';
-import type { LobeChatDatabase } from '@lobechat/database';
+import { type NewGeneration, type NewGenerationBatch } from '@/database/schemas';
+import { type CreateImageServicePayload } from '@/server/routers/lambda/image';
 
 interface ChargeParams {
   clientIp?: string | null;
-  configForDatabase: any;
-  generationParams: any;
+  configForDatabase: CreateImageServicePayload['params'];
+  generationParams: CreateImageServicePayload['params'];
+  generationTopicId: string;
   imageNum: number;
   model: string;
   provider: string;
@@ -17,28 +16,16 @@ interface ChargeParams {
 type ChargeResult =
   | undefined
   | {
-      data?: any;
+      data: {
+        batch: NewGenerationBatch;
+        generations: NewGeneration[];
+      };
       success: true;
     };
 
-const CREDITS_PER_IMAGE = 5; // 5 credits per image generation
-
 export async function chargeBeforeGenerate(
+  // eslint-disable-next-line unused-imports/no-unused-vars
   params: ChargeParams,
-  db?: LobeChatDatabase,
 ): Promise<ChargeResult> {
-  if (!db) return undefined;
-
-  const creditModel = new CreditTransactionsModel(db);
-  const balance = await creditModel.getUserBalance(params.userId);
-  const required = CREDITS_PER_IMAGE * params.imageNum;
-
-  if (balance < required) {
-    throw new TRPCError({
-      code: 'PAYMENT_REQUIRED',
-      message: `Insufficient credits. Need ${required}, have ${balance}. Please top up.`,
-    });
-  }
-
-  return { success: true };
+  return undefined;
 }

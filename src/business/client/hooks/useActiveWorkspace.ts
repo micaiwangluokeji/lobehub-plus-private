@@ -1,19 +1,14 @@
-import { useEffect } from 'react';
+import type { WorkspaceItem } from '@lobechat/database/schemas';
 
-import { useWorkspaceStore } from '@/store/workspace';
-
-export type { WorkspaceListItem } from '@/store/workspace/initialState';
-
-export const useActiveWorkspace = () => {
-  const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
-  const isWorkspacesLoaded = useWorkspaceStore((s) => s.isWorkspacesLoaded);
-  const loadWorkspaces = useWorkspaceStore((s) => s.loadWorkspaces);
-
-  useEffect(() => {
-    if (!isWorkspacesLoaded) {
-      loadWorkspaces();
-    }
-  }, [isWorkspacesLoaded, loadWorkspaces]);
-
-  return activeWorkspace;
+export type WorkspaceListItem = WorkspaceItem & {
+  /**
+   * True when the caller is a non-primary member of a workspace whose paid
+   * subscription has lapsed. The cloud override of `workspace.list` sets it;
+   * open-source stub leaves it absent.
+   */
+  lockedOut?: boolean;
+  plan?: 'business' | 'free' | 'pro';
+  role?: string;
 };
+
+export const useActiveWorkspace = (): WorkspaceListItem | null => null;

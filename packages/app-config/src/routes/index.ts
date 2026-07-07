@@ -47,16 +47,6 @@ export const NAVIGATION_ROUTES: NavigationRoute[] = [
     pathPrefix: '/community',
   },
   {
-    cmdkKey: 'cmdk.discover',
-    electronKey: 'navigation.discoverAgents',
-    icon: ShapesIcon,
-    id: 'discover',
-    keywords: ['discover', 'marketplace', 'agent', 'assistant'],
-    keywordsKey: 'cmdk.keywords.discover',
-    path: '/discover',
-    pathPrefix: '/discover',
-  },
-  {
     cmdkKey: 'cmdk.video',
     electronKey: 'navigation.video',
     icon: Video,

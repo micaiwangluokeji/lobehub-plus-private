@@ -33,7 +33,7 @@ if (typeof window !== 'undefined') {
   });
 }
 
-if (__DEV__ && process.env.ENABLE_REACT_SCAN === 'true') {
+if (__DEV__) {
   void import('react-scan').then(({ scan }) => {
     scan({ enabled: false, showToolbar: true });
   });

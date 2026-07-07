@@ -1,22 +1,16 @@
 'use client';
 
-import { ActionIcon, DropdownMenu, Flexbox, Icon, Tag, type MenuProps } from '@lobehub/ui';
-import { confirmModal } from '@lobehub/ui/base-ui';
+import { Flexbox, Icon, type MenuProps } from '@lobehub/ui';
 import { createStaticStyles } from 'antd-style';
-import { Crown, MoreHorizontal, Rocket, Sparkles, Users, UsersRound } from 'lucide-react';
-import { memo, useCallback, useMemo, useState } from 'react';
+import { Crown, Sparkles, Users, UsersRound } from 'lucide-react';
+import { memo, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
 
-import { message } from '@/components/AntdStaticMethods';
-import { DESKTOP_HEADER_ICON_SMALL_SIZE } from '@/const/layoutTokens';
 import ToggleLeftPanelButton from '@/features/NavPanel/ToggleLeftPanelButton';
 import { usePermission } from '@/hooks/usePermission';
 import { parseAsString, useQueryState } from '@/hooks/useQueryParam';
-import { useClientDataSWR } from '@/libs/swr';
-import { officialGroupKeys } from '@/libs/swr/keys';
 import AddGroupMemberModal from '@/routes/(main)/group/_layout/Sidebar/AddGroupMemberModal';
-import { officialGroupService } from '@/services/officialGroup';
 import { useAgentGroupStore } from '@/store/agentGroup';
 import { agentGroupSelectors } from '@/store/agentGroup/selectors';
 import { useGlobalStore } from '@/store/global';
@@ -39,8 +33,13 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   `,
   tabsWrapper: css`
     scrollbar-width: none;
+
     overflow-x: auto;
+
+    /* A swipe past the tabs' edge must not fire the browser back gesture. */
+    overscroll-behavior-x: none;
     flex: 1;
+
     min-width: 0;
 
     &::-webkit-scrollbar {
@@ -50,12 +49,8 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 }));
 
 const Header = memo(() => {
-  const { t } = useTranslation(['chat', 'setting', 'discover']);
+  const { t } = useTranslation('chat');
   const { allowed: canEdit, reason } = usePermission('edit_own_content');
-  const { allowed: canPublish, hasPermission } = usePermission('publish_group');
-  // super_admin holds `group:publish:all`; VIP holds `group:publish:owner`.
-  const isAdmin = hasPermission('group:publish:all');
-  const isVIP = hasPermission('group:publish:owner');
 
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -65,61 +60,6 @@ const Header = memo(() => {
   const addAgentsToGroup = useAgentGroupStore((s) => s.addAgentsToGroup);
   const createAgentInGroup = useAgentGroupStore((s) => s.createAgentInGroup);
   const showLeftPanel = useGlobalStore(systemStatusSelectors.showLeftPanel);
-
-  const { data: isOfficial, mutate: refreshIsOfficial } = useClientDataSWR(
-    canPublish && activeGroupId ? officialGroupKeys.isOfficial(activeGroupId) : null,
-    () => officialGroupService.isOfficialGroup(activeGroupId!),
-  );
-
-  const { data: isPendingReview, mutate: refreshIsPendingReview } = useClientDataSWR(
-    canPublish && activeGroupId ? officialGroupKeys.isPendingReview(activeGroupId) : null,
-    () => officialGroupService.isPendingReview(activeGroupId!),
-  );
-
-  const handlePublishAsOfficial = useCallback(() => {
-    if (!activeGroupId) return;
-    confirmModal({
-      okButtonProps: { type: 'primary' },
-      onOk: async () => {
-        try {
-          await officialGroupService.publishAsOfficialGroup(activeGroupId);
-          await refreshIsOfficial();
-          await refreshIsPendingReview();
-          // Admins publish/update directly; VIPs go through review.
-          const successKey = isAdmin
-            ? isOfficial
-              ? 'publish.updateSuccess'
-              : 'publish.publishSuccess'
-            : 'publish.submitSuccess';
-          message.success(t(successKey, { ns: 'discover' }));
-        } catch (error: any) {
-          console.error('Failed to publish group as official:', error);
-          const errMsg = error?.data?.message || error?.message || t('publish.publishFailed', { ns: 'discover' });
-          message.error(`发布失败: ${errMsg}`);
-        }
-      },
-      title: t('settingGroup.discover.publishConfirm', { ns: 'setting' }),
-    });
-  }, [activeGroupId, refreshIsOfficial, refreshIsPendingReview, isAdmin, isOfficial, t]);
-
-  const handleUnpublishOfficial = useCallback(() => {
-    if (!activeGroupId) return;
-    confirmModal({
-      okButtonProps: { danger: true },
-      onOk: async () => {
-        try {
-          await officialGroupService.unpublishOfficialGroup(activeGroupId);
-          await refreshIsOfficial();
-          await refreshIsPendingReview();
-          message.success(t('publish.unpublishSuccess', { ns: 'discover' }));
-        } catch (error) {
-          console.error('Failed to unpublish official group:', error);
-          message.error(t('settingGroup.discover.unpublishFailed', { ns: 'setting' }));
-        }
-      },
-      title: t('settingGroup.discover.unpublishConfirm', { ns: 'setting' }),
-    });
-  }, [activeGroupId, refreshIsOfficial, refreshIsPendingReview, t]);
 
   // Use URL query param for selected tab
   const [selectedTabId, setSelectedTabId] = useQueryState(
@@ -186,74 +126,6 @@ const Header = memo(() => {
     [activeGroupId, t],
   );
 
-  const moreMenuItems = useMemo(() => {
-    if (!canPublish) return [];
-
-    const items: MenuProps['items'] = [];
-
-    if (isAdmin) {
-      if (isOfficial) {
-        items.push(
-          {
-            icon: <Icon icon={Rocket} />,
-            key: 'update-official',
-            label: t('publish.updateToDiscover', { ns: 'discover' }),
-            onClick: handlePublishAsOfficial,
-          },
-          {
-            danger: true,
-            icon: <Icon icon={Rocket} />,
-            key: 'unpublish-official',
-            label: t('publish.unpublish', { ns: 'discover' }),
-            onClick: handleUnpublishOfficial,
-          },
-        );
-      } else {
-        items.push({
-          icon: <Icon icon={Rocket} />,
-          key: 'publish-official',
-          label: t('publish.publishToDiscover', { ns: 'discover' }),
-          onClick: handlePublishAsOfficial,
-        });
-      }
-    } else if (isVIP) {
-      if (isOfficial) {
-        items.push(
-          {
-            icon: <Icon icon={Rocket} />,
-            key: 'submit-update-review',
-            label: t('publish.submitUpdateReview', { ns: 'discover' }),
-            onClick: handlePublishAsOfficial,
-          },
-          {
-            danger: true,
-            icon: <Icon icon={Rocket} />,
-            key: 'unpublish-official',
-            label: t('publish.unpublish', { ns: 'discover' }),
-            onClick: handleUnpublishOfficial,
-          },
-        );
-      } else {
-        items.push({
-          icon: <Icon icon={Rocket} />,
-          key: 'submit-for-review',
-          label: t('publish.submitForReview', { ns: 'discover' }),
-          onClick: handlePublishAsOfficial,
-        });
-      }
-    }
-
-    return items;
-  }, [
-    canPublish,
-    isAdmin,
-    isOfficial,
-    isVIP,
-    handlePublishAsOfficial,
-    handleUnpublishOfficial,
-    t,
-  ]);
-
   return (
     <>
       <Flexbox horizontal align="center" className={styles.header} gap={4} justify="space-between">
@@ -269,16 +141,6 @@ const Header = memo(() => {
           />
         </div>
         <Flexbox horizontal align="center" flex="none" gap={8} style={{ marginInlineStart: 12 }}>
-          {isPendingReview && (
-            <Tag bordered={false} color="orange">
-              {t('publish.waitingForReview', { ns: 'discover' })}
-            </Tag>
-          )}
-          {canPublish && moreMenuItems.length > 0 && (
-            <DropdownMenu items={moreMenuItems}>
-              <ActionIcon icon={MoreHorizontal} size={DESKTOP_HEADER_ICON_SMALL_SIZE} />
-            </DropdownMenu>
-          )}
           <AgentBuilderToggle />
         </Flexbox>
       </Flexbox>

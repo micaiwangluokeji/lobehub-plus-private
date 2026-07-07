@@ -21,7 +21,6 @@ import FullNameRow from './features/FullNameRow';
 import InterestsRow from './features/InterestsRow';
 import PasswordRow from './features/PasswordRow';
 import ProfileRow from './features/ProfileRow';
-import RoleRow from './features/RoleRow';
 import SSOProvidersList from './features/SSOProvidersList';
 import UsernameRow from './features/UsernameRow';
 
@@ -88,13 +87,6 @@ const ProfileSetting = () => {
           <Divider style={{ margin: 0 }} />
 
           <UsernameRow />
-
-          {isLogin && (
-            <>
-              <Divider style={{ margin: 0 }} />
-              <RoleRow />
-            </>
-          )}
 
           <Divider style={{ margin: 0 }} />
 

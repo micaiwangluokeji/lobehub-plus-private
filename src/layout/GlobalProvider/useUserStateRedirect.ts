@@ -24,7 +24,6 @@ const RESERVED_FIRST_SEGMENTS = new Set([
   'page',
   'resource',
   'settings',
-  'admin',
   'share',
   'signin',
   'signup',

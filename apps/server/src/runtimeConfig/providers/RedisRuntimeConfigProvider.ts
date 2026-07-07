@@ -154,36 +154,4 @@ export class RedisRuntimeConfigProvider<T> implements RuntimeConfigProvider<T> {
       return null;
     }
   }
-
-  async publishSnapshot(data: T, selector?: RuntimeConfigSelector): Promise<void> {
-    try {
-      const redis = await initializeRedis(getRedisConfig());
-      if (!redis) {
-        log('[RuntimeConfig] Redis not available, skipping publish');
-        return;
-      }
-
-      const key = this.domain.getStorageKey(selector);
-      const now = new Date().toISOString();
-
-      const previous = await this.getSnapshot(selector);
-      const nextVersion = previous ? previous.version + 1 : 1;
-
-      const envelope: VersionedSnapshot<T> = {
-        data,
-        updatedAt: now,
-        version: nextVersion,
-      };
-
-      await redis.set(key, JSON.stringify(envelope));
-
-      // Invalidate local cache so next read picks up the new data
-      this.cache.delete(this.getCacheKey(selector));
-
-      log('[RuntimeConfig] Published snapshot for domain %s, version %d', this.domain.key, nextVersion);
-    } catch (error) {
-      console.error('[RuntimeConfig] Failed to publish runtime config to Redis:', error);
-      throw error;
-    }
-  }
 }

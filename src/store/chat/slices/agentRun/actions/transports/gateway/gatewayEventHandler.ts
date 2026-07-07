@@ -429,6 +429,7 @@ export const createGatewayEventHandler = (
           // Reset accumulators for the new stream
           accumulatedContent = '';
           accumulatedReasoning = '';
+          get().updateOperationMetadata(operationId, { visibleLoadingDone: false });
 
           // Skip the DB read ONLY for native gateway streams — those carry
           // `assistantMessage.id` directly on stream_start AND the preceding
@@ -550,11 +551,44 @@ export const createGatewayEventHandler = (
 
       case 'stream_end': {
         enqueue(() => {
-          // Only clear tool calling streaming — keep message loading active
-          // until agent_runtime_end so users don't think the session ended
-          // during tool execution gaps between steps
+          const data = toRecord(event.data);
+          const finalContent = pickNonEmptyString(data?.finalContent);
+          if (finalContent !== undefined) {
+            // Example: reasoning-only answers stream as reasoning chunks, then
+            // the server promotes that text into stream_end.finalContent. Apply
+            // it before ending reasoning so visible_output_end cannot leave an
+            // empty completed assistant bubble while waiting for terminal SoT.
+            accumulatedContent = finalContent;
+            hasStreamedContent = true;
+            get().internal_dispatchMessage(
+              {
+                id: currentAssistantMessageId,
+                type: 'updateMessage',
+                value: { content: accumulatedContent },
+              },
+              dispatchContext,
+            );
+          }
           get().internal_toggleToolCallingStreaming(currentAssistantMessageId, undefined);
           endReasoningIfNeeded();
+        });
+        break;
+      }
+
+      case 'visible_output_end': {
+        enqueue(() => {
+          get().internal_toggleToolCallingStreaming(currentAssistantMessageId, undefined);
+          endReasoningIfNeeded();
+          // Example: CC/Codex may emit stream_end -> stream_start(newStep) for
+          // assistant-assistant transitions. Only this explicit producer signal
+          // means visible output is done; the operation still waits for
+          // agent_runtime_end to preserve terminal side-effect ordering.
+          get().updateOperationMetadata(operationId, { visibleLoadingDone: true });
+          // The sidebar "running" spinner is driven off `topic.status === 'running'`
+          // (persisted, reset at the terminal) for gateway/hetero runs — no
+          // client-only `topicLoadingIds` early-clear here, so the topic keeps
+          // spinning through the post-visible-output terminal side-effects until
+          // the run actually completes.
         });
         break;
       }

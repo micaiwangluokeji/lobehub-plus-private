@@ -1,24 +1,11 @@
 import { Flexbox } from '@lobehub/ui';
-import { type FC, useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router';
-
-import { usePermission } from '@/hooks/usePermission';
+import { type FC } from 'react';
+import { Outlet } from 'react-router';
 
 import Sidebar from './Sidebar';
 import { styles } from './style';
 
 const Layout: FC = () => {
-  const navigate = useNavigate();
-  const { allowed: canManageOfficial } = usePermission('manage_official_agents');
-
-  useEffect(() => {
-    if (!canManageOfficial) {
-      navigate('/');
-    }
-  }, [canManageOfficial, navigate]);
-
-  if (!canManageOfficial) return null;
-
   return (
     <>
       <Sidebar />

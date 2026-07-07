@@ -5,34 +5,41 @@ import { memo } from 'react';
 
 import { withSuspense } from '@/components/withSuspense';
 import { useQuery } from '@/hooks/useQuery';
-import { useClientDataSWR } from '@/libs/swr';
-import { officialAgentKeys } from '@/libs/swr/keys';
-import { officialAgentService } from '@/services/officialAgent';
+import { useDiscoverStore } from '@/store/discover';
+import { type AssistantMarketSource, type AssistantQueryParams } from '@/types/discover';
 import { DiscoverTab } from '@/types/discover';
 
 import Pagination from '../features/Pagination';
-import OfficialAgentList from './features/OfficialList';
+import List from './features/List';
 import Loading from './loading';
 
-const Client = memo<{ mobile?: boolean }>(({ mobile }) => {
-  const { q, page } = useQuery() as { q?: string; page?: number };
-  const currentPage = page ? Number(page) : 1;
-
-  const { data, isLoading } = useClientDataSWR(
-    officialAgentKeys.list(q, currentPage, 21),
-    () => officialAgentService.getOfficialAgents({ keyword: q, page: currentPage, pageSize: 21 }),
-  );
+const Client = memo<{ mobile?: boolean }>(() => {
+  const { q, page, category, sort, order, ownerId, source } = useQuery() as AssistantQueryParams;
+  const marketSource = (source as AssistantMarketSource | undefined) ?? 'new';
+  const useAssistantList = useDiscoverStore((s) => s.useAssistantList);
+  const { data, isLoading } = useAssistantList({
+    category,
+    order,
+    ownerId,
+    page,
+    pageSize: 21,
+    q,
+    sort,
+    source: marketSource,
+  });
 
   if (isLoading || !data) return <Loading />;
 
+  const { items, currentPage, pageSize, totalCount } = data;
+
   return (
     <Flexbox gap={32} width={'100%'}>
-      <OfficialAgentList data={data.items} mobile={mobile} />
+      <List data={items} />
       <Pagination
-        currentPage={data.page}
-        pageSize={data.pageSize}
+        currentPage={currentPage}
+        pageSize={pageSize}
         tab={DiscoverTab.Assistants}
-        total={data.totalCount}
+        total={totalCount}
       />
     </Flexbox>
   );

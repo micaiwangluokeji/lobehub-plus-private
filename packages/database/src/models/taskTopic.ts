@@ -21,7 +21,24 @@ export class TaskTopicModel {
   }
 
   private ownership = () =>
-    buildWorkspaceWhere({ userId: this.userId, workspaceId: this.workspaceId }, taskTopics);
+    buildWorkspaceWhere(
+      { userId: this.userId, workspaceId: this.workspaceId },
+      {
+        userId: taskTopics.userId,
+        visibility: taskTopics.visibility,
+        workspaceId: taskTopics.workspaceId,
+      },
+    );
+
+  /** Look up the parent task's visibility so newly added topics mirror it. */
+  private async getTaskVisibility(taskId: string): Promise<'private' | 'public'> {
+    const row = await this.db
+      .select({ visibility: tasks.visibility })
+      .from(tasks)
+      .where(eq(tasks.id, taskId))
+      .limit(1);
+    return row[0]?.visibility ?? 'public';
+  }
 
   /**
    * Mirror a terminal taskTopic transition onto the underlying topic record:
@@ -48,6 +65,7 @@ export class TaskTopicModel {
     topicId: string,
     params: { operationId?: string; seq: number },
   ): Promise<void> {
+    const visibility = await this.getTaskVisibility(taskId);
     await this.db
       .insert(taskTopics)
       .values({
@@ -56,6 +74,7 @@ export class TaskTopicModel {
         taskId,
         topicId,
         userId: this.userId,
+        visibility,
         workspaceId: this.workspaceId ?? null,
       })
       .onConflictDoNothing();
@@ -128,6 +147,22 @@ export class TaskTopicModel {
       .where(and(eq(taskTopics.taskId, taskId), eq(taskTopics.topicId, topicId), this.ownership()));
   }
 
+  /**
+   * Patch the raw run output into `handoff.content` (LOBE-11396) without
+   * disturbing other handoff keys. Uses `jsonb_set` so it is order-independent
+   * with respect to `updateHandoff` — critically, this lets the caller persist
+   * the last message even when the (separate) handoff-summary LLM call fails, so
+   * the run card always has a result to show.
+   */
+  async updateHandoffContent(taskId: string, topicId: string, content: string): Promise<void> {
+    await this.db
+      .update(taskTopics)
+      .set({
+        handoff: sql`jsonb_set(COALESCE(${taskTopics.handoff}, '{}'::jsonb), '{content}', ${JSON.stringify(content)}::jsonb)`,
+      })
+      .where(and(eq(taskTopics.taskId, taskId), eq(taskTopics.topicId, topicId), this.ownership()));
+  }
+
   async updateReview(
     taskId: string,
     topicId: string,
@@ -192,6 +227,22 @@ export class TaskTopicModel {
       .select()
       .from(taskTopics)
       .where(and(eq(taskTopics.taskId, taskId), this.ownership()))
+      .orderBy(desc(taskTopics.seq));
+  }
+
+  async findRunningByTaskIds(taskIds: string[]): Promise<TaskTopicItem[]> {
+    if (taskIds.length === 0) return [];
+
+    return this.db
+      .select()
+      .from(taskTopics)
+      .where(
+        and(
+          inArray(taskTopics.taskId, taskIds),
+          eq(taskTopics.status, 'running'),
+          this.ownership(),
+        ),
+      )
       .orderBy(desc(taskTopics.seq));
   }
 

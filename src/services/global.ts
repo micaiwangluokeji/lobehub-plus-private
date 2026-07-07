@@ -72,10 +72,6 @@ class GlobalService extends BusinessGlobalService {
   getDefaultAgentConfig = async (): Promise<PartialDeep<LobeAgentConfig>> => {
     return lambdaClient.config.getDefaultAgentConfig.query();
   };
-
-  updateNavVisibility = async (navVisibility: Record<string, boolean>) => {
-    return lambdaClient.config.updateNavVisibility.mutate(navVisibility);
-  };
 }
 
 export const globalService = new GlobalService();

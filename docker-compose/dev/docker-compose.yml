@@ -1,24 +1,24 @@
-name: lobehub-dev
+name: lobehub
 services:
   network-service:
     image: alpine
-    container_name: lobehub-dev-network
+    container_name: lobe-network
     restart: always
     ports:
       - '${RUSTFS_PORT}:9000' # RustFS API
-      - '19001:9001' # RustFS Console
+      - '9001:9001' # RustFS Console
       - '${LOBE_PORT}:3210' # LobeChat
     command: tail -f /dev/null
     networks:
-      - lobehub-dev-network
+      - lobe-network
     env_file:
       - .env
 
   postgresql:
     image: paradedb/paradedb:latest-pg17
-    container_name: lobehub-dev-postgres
+    container_name: lobe-postgres
     ports:
-      - '15432:5432'
+      - '5432:5432'
     volumes:
       - './data:/var/lib/postgresql/data'
     command: ['postgres', '-c', 'shared_preload_libraries=pg_search']
@@ -32,15 +32,15 @@ services:
       retries: 5
     restart: always
     networks:
-      - lobehub-dev-network
+      - lobe-network
     env_file:
       - .env
 
   redis:
     image: redis:7-alpine
-    container_name: lobehub-dev-redis
+    container_name: lobe-redis
     ports:
-      - '16380:6379'
+      - '6379:6379'
     command: redis-server --save 60 1000 --appendonly yes
     volumes:
       - 'redis_data:/data'
@@ -51,11 +51,11 @@ services:
       retries: 5
     restart: always
     networks:
-      - lobehub-dev-network
+      - lobe-network
 
   rustfs:
     image: rustfs/rustfs:latest
-    container_name: lobehub-dev-rustfs
+    container_name: lobe-rustfs
     network_mode: 'service:network-service'
     environment:
       - RUSTFS_CONSOLE_ENABLE=true
@@ -74,7 +74,7 @@ services:
 
   rustfs-init:
     image: minio/mc:latest
-    container_name: lobehub-dev-rustfs-init
+    container_name: lobe-rustfs-init
     depends_on:
       rustfs:
         condition: service_healthy
@@ -93,22 +93,22 @@ services:
       '
     restart: 'no'
     networks:
-      - lobehub-dev-network
+      - lobe-network
     env_file:
       - .env
 
   searxng:
     image: searxng/searxng
-    container_name: lobehub-dev-searxng
+    container_name: lobe-searxng
     ports:
-      - '18180:8080'
+      - '8180:8080'
     volumes:
       - './searxng-settings.yml:/etc/searxng/settings.yml'
     environment:
       - 'SEARXNG_SETTINGS_FILE=/etc/searxng/settings.yml'
     restart: always
     networks:
-      - lobehub-dev-network
+      - lobe-network
 
 volumes:
   data:
@@ -119,5 +119,5 @@ volumes:
     driver: local
 
 networks:
-  lobehub-dev-network:
+  lobe-network:
     driver: bridge

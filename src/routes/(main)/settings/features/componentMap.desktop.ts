@@ -18,7 +18,6 @@ import Messenger from '../messenger';
 import Profile from '../profile';
 import Provider from '../provider';
 import Proxy from '../proxy';
-import Review from '../review';
 import Security from '../security';
 import ServiceModel from '../service-model';
 import Skill from '../skill';
@@ -48,7 +47,6 @@ export const componentMap = {
   [SettingsTabs.Creds]: Creds,
   [SettingsTabs.Security]: Security,
   [SettingsTabs.Skill]: Skill,
-  [SettingsTabs.Review]: Review,
 
   [SettingsTabs.Plans]: Plans,
   [SettingsTabs.Credits]: Credits,

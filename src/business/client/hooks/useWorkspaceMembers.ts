@@ -1,16 +1,3 @@
-import { useFetchWorkspaceMembers } from './useFetchWorkspaceMembers';
+import type { WorkspaceMemberItem } from '@lobechat/database/schemas';
 
-export interface WorkspaceMember {
-  id: string;
-  userId: string;
-  role: string;
-  joinedAt: Date;
-  email?: string | null;
-  fullName?: string | null;
-  avatar?: string | null;
-}
-
-export const useWorkspaceMembers = (): WorkspaceMember[] => {
-  const { data } = useFetchWorkspaceMembers();
-  return data as WorkspaceMember[];
-};
+export const useWorkspaceMembers = (): WorkspaceMemberItem[] => [];
