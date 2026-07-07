@@ -16,7 +16,7 @@ on:
 
 jobs:
   sync-and-push:
-    name: Sync canary to Gitee & private repo
+    name: Sync upstream canary and push to Gitee & Private Repo
     runs-on: ubuntu-latest
     if: ${{ github.event.repository.fork }}
 
@@ -49,9 +49,11 @@ jobs:
         run: |
           git config --global credential.helper store
           echo "https://pieth:${GITEE_TOKEN}@gitee.com" > ~/.git-credentials
+
           git remote rm gitee 2>/dev/null || true
           git remote add gitee https://gitee.com/pieth/lobehub-plus.git
           git push -f gitee canary
+
           rm -f ~/.git-credentials
           git config --global --unset credential.helper || true
 
@@ -59,13 +61,10 @@ jobs:
         env:
           GH_PAT: ${{ secrets.GH_PRIVATE_REPO_PAT }}
         run: |
-          git config --global credential.helper store
-          echo "https://piepiepie:${GH_PAT}@github.com" > ~/.git-credentials
+          # 使用 URL 内嵌 Token 方式推送私有仓库（Classic PAT 支持，且不受 Actions runner 凭证干扰）
           git remote rm private_repo 2>/dev/null || true
-          git remote add private_repo https://github.com/micaiwangluokeji/lobehub-plus-private.git
+          git remote add private_repo https://piepiepie:${GH_PAT}@github.com/micaiwangluokeji/lobehub-plus-private.git
           git push -f private_repo canary
-          rm -f ~/.git-credentials
-          git config --global --unset credential.helper || true
 
       - name: Print sync summary
         run: |
