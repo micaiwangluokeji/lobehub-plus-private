@@ -1,0 +1,83 @@
+name: Sync Canary to Gitee & Private Repo
+
+permissions:
+  contents: write
+
+on:
+  # 自动同步：每4小时检查上游更新
+  schedule:
+    - cron: '0 */4 * * *'
+  # 手动同步：点击 GitHub 仓库的 "Sync fork" 后自动触发
+  push:
+    branches:
+      - canary
+  # 手动触发
+  workflow_dispatch:
+
+jobs:
+  sync-and-push:
+    name: Sync upstream canary and push to Gitee & Private Repo
+    runs-on: ubuntu-latest
+    if: ${{ github.event.repository.fork }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: canary
+
+      - name: Sync upstream canary to GitHub fork
+        id: sync
+        uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
+        with:
+          upstream_sync_repo: lobehub/lobehub
+          upstream_sync_branch: canary
+          target_sync_branch: canary
+          target_repo_token: ${{ secrets.GITHUB_TOKEN }}
+          test_mode: false
+
+      - name: Show sync result
+        run: |
+          if [ "${{ steps.sync.outputs.has_new_commits }}" == "true" ]; then
+            echo "✅ 上游有新的提交，已同步到 GitHub fork 的 canary 分支"
+          else
+            echo "✅ 上游 canary 无新提交，无需同步"
+          fi
+
+      - name: Push to Gitee canary
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+        run: |
+          git config --global credential.helper store
+          echo "https://pieth:${GITEE_TOKEN}@gitee.com" > ~/.git-credentials
+
+          git remote rm gitee 2>/dev/null || true
+          git remote add gitee https://gitee.com/pieth/lobehub-plus.git
+          git push -f gitee canary
+
+          rm -f ~/.git-credentials
+          git config --global --unset credential.helper || true
+
+      - name: Push to private GitHub repo canary
+        env:
+          GH_PAT: ${{ secrets.GH_PRIVATE_REPO_PAT }}
+        run: |
+          # 使用 credential.helper store 覆盖 checkout 设置的 GITHUB_TOKEN 凭证
+          git config --global credential.helper store
+          echo "https://piepiepie:${GH_PAT}@github.com" > ~/.git-credentials
+
+          git remote rm private_repo 2>/dev/null || true
+          git remote add private_repo https://github.com/micaiwangluokeji/lobehub-plus-private.git
+          git push -f private_repo canary
+
+          rm -f ~/.git-credentials
+          git config --global --unset credential.helper || true
+
+      - name: Print sync summary
+        run: |
+          echo "### 🚀 同步完成" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| 目标 | 状态 |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Gitee \`pieth/lobehub-plus\` (canary) | ✅ 已推送 |" >> $GITHUB_STEP_SUMMARY
+          echo "| GitHub \`micaiwangluokeji/lobehub-plus-private\` (canary) | ✅ 已推送 |" >> $GITHUB_STEP_SUMMARY
+          echo "| 最新提交 | \`$(git log --oneline -1)\` |" >> $GITHUB_STEP_SUMMARY
