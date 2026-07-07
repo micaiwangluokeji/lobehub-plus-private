@@ -103,3 +103,30 @@ export const getServerFeatureFlagsStateFromRuntimeConfig = async (userId?: strin
   const flags = await getServerFeatureFlagsFromRuntimeConfig(userId);
   return mapFeatureFlagsEnvToState(flags, userId);
 };
+
+/**
+ * Publish updated feature flags to Redis, merging with the current published state.
+ * Used by the admin nav-visibility config UI.
+ */
+export const publishFeatureFlags = async (patch: Partial<IFeatureFlags>) => {
+  const redisProvider = new RedisRuntimeConfigProvider(FEATURE_FLAGS_DOMAIN);
+
+  if (!redisProvider.isEnabled()) {
+    debug('Redis not enabled, skipping feature flag publish');
+    return;
+  }
+
+  const currentSnapshot = await redisProvider.getSnapshot({ scope: 'global' });
+  const currentData = currentSnapshot?.data ?? {};
+
+  const merged = merge(DEFAULT_FEATURE_FLAGS, currentData, patch);
+
+  const parsed = FeatureFlagsSchema.safeParse(merged);
+  if (!parsed.success) {
+    throw new Error(`Invalid feature flags: ${parsed.error.message}`);
+  }
+
+  await redisProvider.publishSnapshot(parsed.data, { scope: 'global' });
+
+  debug('Published feature flags patch: %O', patch);
+};
