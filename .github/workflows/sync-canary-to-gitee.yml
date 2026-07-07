@@ -12,7 +12,7 @@ on:
     branches:
       - canary
   # 手动触发
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 jobs:
   sync-and-push:
@@ -61,10 +61,16 @@ jobs:
         env:
           GH_PAT: ${{ secrets.GH_PRIVATE_REPO_PAT }}
         run: |
-          # 使用 URL 内嵌 Token 方式推送私有仓库（Classic PAT 支持，且不受 Actions runner 凭证干扰）
+          # 使用 credential.helper store 覆盖 checkout 设置的 GITHUB_TOKEN 凭证
+          git config --global credential.helper store
+          echo "https://piepiepie:${GH_PAT}@github.com" > ~/.git-credentials
+
           git remote rm private_repo 2>/dev/null || true
-          git remote add private_repo https://piepiepie:${GH_PAT}@github.com/micaiwangluokeji/lobehub-plus-private.git
+          git remote add private_repo https://github.com/micaiwangluokeji/lobehub-plus-private.git
           git push -f private_repo canary
+
+          rm -f ~/.git-credentials
+          git config --global --unset credential.helper || true
 
       - name: Print sync summary
         run: |
