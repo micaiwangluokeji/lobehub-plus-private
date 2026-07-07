@@ -526,7 +526,6 @@ export default {
   'dictConfig.form.description': '描述',
 
   // Membership Levels
-  'nav.membership': '会员等级',
   'membership.title': '会员等级',
   'membership.subtitle': '管理会员等级体系，配置等级权益和升级条件',
   'membership.create': '新增等级',

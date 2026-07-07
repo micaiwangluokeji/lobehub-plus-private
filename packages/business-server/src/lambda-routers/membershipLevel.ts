@@ -3,8 +3,9 @@ import { z } from 'zod';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { MembershipLevelsModel } from '@/database/models/membershipLevels';
+import { adminGuardProcedure } from '@/business/server/trpc-middlewares/adminGuard';
 
-const adminProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
+const adminProcedure = adminGuardProcedure.use(async (opts) => {
   const { ctx } = opts;
   return opts.next({
     ctx: {

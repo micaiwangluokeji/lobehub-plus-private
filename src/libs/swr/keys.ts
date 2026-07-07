@@ -559,6 +559,19 @@ export const chatToolKeys = {
 // header is `portal:` not `document:`.
 // =========================================================================
 
+// ---- billing (credits / plans / referral) --------------------------------
+export const billingKeys = {
+  creditBalance: def('billing:creditBalance', () => ['billing:creditBalance']),
+  creditHistory: def('billing:creditHistory', (page: number) => ['billing:creditHistory', page]),
+  publicPlans: def('billing:publicPlans', () => ['billing:publicPlans']),
+  creditConfig: def('billing:creditConfig', () => ['billing:creditConfig']),
+  membershipLevels: def('billing:membershipLevels', () => ['billing:membershipLevels']),
+  referralStats: def('billing:referralStats', () => ['billing:referralStats']),
+  myReferrals: def('billing:myReferrals', () => ['billing:myReferrals']),
+  myOrders: def('billing:myOrders', () => ['billing:myOrders']),
+  activeSubscription: def('billing:activeSubscription', () => ['billing:activeSubscription']),
+};
+
 // ---- stats (settings/stats + user header counts) ------------------------
 export const statsKeys = {
   countMessages: def('stats:countMessages', () => ['stats:countMessages']),
@@ -921,6 +934,7 @@ export const swrKeys = {
   ollama: ollamaKeys,
   onboarding: onboardingKeys,
   openInApp: openInAppKeys,
+  billing: billingKeys,
   portal: portalKeys,
   provider: providerKeys,
   ragEval: ragEvalKeys,

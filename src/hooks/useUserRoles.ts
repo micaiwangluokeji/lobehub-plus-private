@@ -11,16 +11,18 @@ import { useUserStore } from '@/store/user';
 export interface UserRoleSummary {
   /** Raw role list from the backend (global + workspace-scoped). */
   roles: string[];
-  /** Highest-priority global system role: super_admin > vip_user > free_user. */
-  primaryRole: 'super_admin' | 'vip_user' | 'free_user';
+  /** Highest-priority global system role: super_admin > pro_user > vip_user > free_user. */
+  primaryRole: 'super_admin' | 'pro_user' | 'vip_user' | 'free_user';
   isSuperAdmin: boolean;
+  isPro: boolean;
   isVip: boolean;
   isFreeUser: boolean;
   isLoading: boolean;
 }
 
 const ROLE_PRIORITY: Record<string, number> = {
-  super_admin: 3,
+  super_admin: 4,
+  pro_user: 3,
   vip_user: 2,
   free_user: 1,
 };
@@ -45,7 +47,7 @@ export const useUserRoles = (): UserRoleSummary => {
       .filter((r) => r.workspaceId === null && r.isActive)
       .map((r) => r.name);
 
-    const primaryRole = roleNames.reduce<'super_admin' | 'vip_user' | 'free_user'>(
+    const primaryRole = roleNames.reduce<'super_admin' | 'pro_user' | 'vip_user' | 'free_user'>(
       (acc, name) => (ROLE_PRIORITY[name] > ROLE_PRIORITY[acc] ? (name as typeof acc) : acc),
       'free_user',
     );
@@ -54,6 +56,7 @@ export const useUserRoles = (): UserRoleSummary => {
       roles: roleNames,
       primaryRole,
       isSuperAdmin: primaryRole === 'super_admin',
+      isPro: primaryRole === 'pro_user',
       isVip: primaryRole === 'vip_user',
       isFreeUser: primaryRole === 'free_user',
       isLoading,

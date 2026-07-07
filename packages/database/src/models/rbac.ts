@@ -86,8 +86,15 @@ export class RbacModel {
    * scope suffix as stored in `rbac_permissions.code`.
    */
   getUserPermissions = async (arg?: string | RbacScopeOptions): Promise<string[]> => {
-    // ★ isRoot 短路
-    if (await this.isRootUser()) return [];
+    // ★ isRoot 短路 — return ALL active permission codes so the frontend
+    //    usePermission hook sees full access and unlocks all UI controls.
+    if (await this.isRootUser()) {
+      const allPerms = await this.db
+        .select({ code: permissions.code })
+        .from(permissions)
+        .where(eq(permissions.isActive, true));
+      return allPerms.map(p => p.code);
+    }
 
     const opts = normalizeScope(arg);
     const targetUserId = opts.userId || this.userId;
@@ -123,8 +130,18 @@ export class RbacModel {
   getUserPermissionDetails = async (
     arg?: string | RbacScopeOptions,
   ): Promise<UserPermissionInfo[]> => {
-    // ★ isRoot 短路
-    if (await this.isRootUser()) return [];
+    // ★ isRoot 短路 — return ALL active permission details.
+    if (await this.isRootUser()) {
+      return this.db
+        .select({
+          category: permissions.category,
+          permissionCode: permissions.code,
+          permissionName: permissions.name,
+          roleName: sql`'super_admin'`.as('roleName'),
+        })
+        .from(permissions)
+        .where(eq(permissions.isActive, true));
+    }
 
     const opts = normalizeScope(arg);
     const targetUserId = opts.userId || this.userId;

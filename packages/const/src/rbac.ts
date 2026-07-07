@@ -18,7 +18,32 @@ export const PERMISSION_ACTIONS = {
   AGENT_UPDATE: 'agent:update',
 
   // ==================== Group Management ====================
+  GROUP_CREATE: 'group:create',
+
+  GROUP_DELETE: 'group:delete',
+
+  GROUP_READ: 'group:read',
+
+  GROUP_UPDATE: 'group:update',
+
+  GROUP_FORK: 'group:fork',
+
   GROUP_PUBLISH: 'group:publish',
+
+  // ==================== Billing & Credits Management ====================
+  BILLING_READ: 'billing:read',
+
+  BILLING_MANAGE: 'billing:manage',
+
+  CREDIT_READ: 'credit:read',
+
+  CREDIT_MANAGE: 'credit:manage',
+
+  SUBSCRIPTION_READ: 'subscription:read',
+
+  SUBSCRIPTION_MANAGE: 'subscription:manage',
+
+  REFERRAL_READ: 'referral:read',
 
   // ==================== AI Infrastructure Management ====================
   AI_MODEL_CREATE: 'ai_model:create',
@@ -273,6 +298,7 @@ export const ALL_SCOPE = 'ALL';
  */
 export const SYSTEM_DEFAULT_ROLES = {
   SUPER_ADMIN: 'super_admin',
+  PRO_USER: 'pro_user',
   VIP_USER: 'vip_user',
   FREE_USER: 'free_user',
 } as const;
@@ -285,12 +311,14 @@ export type SystemDefaultRoleName =
  */
 export const ROLE_DESCRIPTIONS = {
   [SYSTEM_DEFAULT_ROLES.SUPER_ADMIN]: 'Administrator with all system permissions',
-  [SYSTEM_DEFAULT_ROLES.VIP_USER]: 'VIP user with extended permissions',
-  [SYSTEM_DEFAULT_ROLES.FREE_USER]: 'Free user with limited permissions',
+  [SYSTEM_DEFAULT_ROLES.PRO_USER]: 'Pro user with full creation and publishing permissions',
+  [SYSTEM_DEFAULT_ROLES.VIP_USER]: 'VIP user with extended permissions (legacy, superseded by pro_user)',
+  [SYSTEM_DEFAULT_ROLES.FREE_USER]: 'Free user with basic usage permissions',
 } as const;
 
 export const SYSTEM_ROLE_DISPLAY_NAMES: Record<SystemDefaultRoleName, string> = {
   [SYSTEM_DEFAULT_ROLES.SUPER_ADMIN]: 'Super Admin',
+  [SYSTEM_DEFAULT_ROLES.PRO_USER]: 'Pro User',
   [SYSTEM_DEFAULT_ROLES.VIP_USER]: 'VIP User',
   [SYSTEM_DEFAULT_ROLES.FREE_USER]: 'Free User',
 };
@@ -509,15 +537,21 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<SystemDefaultRoleName, readonly str
   [SYSTEM_DEFAULT_ROLES.SUPER_ADMIN]: Object.values(PERMISSION_ACTIONS).map(
     (code) => `${code}:all`,
   ),
-  [SYSTEM_DEFAULT_ROLES.VIP_USER]: [
-    // Agent — VIP can create/fork globally, manage own
+  [SYSTEM_DEFAULT_ROLES.PRO_USER]: [
+    // Agent — full creation + publishing (review flow)
     `${action('AGENT_CREATE')}:all`,
     `${action('AGENT_READ')}:all`,
     `${action('AGENT_UPDATE')}:owner`,
     `${action('AGENT_DELETE')}:owner`,
     `${action('AGENT_FORK')}:all`,
     `${action('AGENT_PUBLISH')}:owner`,
-    // Group — VIP can publish own groups
+    // Group — publish own
+    // Group — full CRUD + publish own
+    `${action('GROUP_CREATE')}:owner`,
+    `${action('GROUP_READ')}:all`,
+    `${action('GROUP_UPDATE')}:owner`,
+    `${action('GROUP_DELETE')}:owner`,
+    `${action('GROUP_FORK')}:owner`,
     `${action('GROUP_PUBLISH')}:owner`,
     // Session
     `${action('SESSION_READ')}:all`,
@@ -554,10 +588,13 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<SystemDefaultRoleName, readonly str
     `${action('KNOWLEDGE_BASE_CREATE')}:owner`,
     `${action('KNOWLEDGE_BASE_UPDATE')}:owner`,
     `${action('KNOWLEDGE_BASE_DELETE')}:owner`,
-    // AI Infrastructure — read + invoke
+    // AI Infrastructure — read + invoke + create own
     `${action('AI_MODEL_READ')}:all`,
     `${action('AI_MODEL_INVOKE')}:all`,
+    `${action('AI_MODEL_CREATE')}:owner`,
     `${action('AI_PROVIDER_READ')}:all`,
+    `${action('AI_PROVIDER_CREATE')}:owner`,
+    `${action('AI_PROVIDER_UPDATE')}:owner`,
     // API Key — own only
     `${action('API_KEY_READ')}:owner`,
     `${action('API_KEY_CREATE')}:owner`,
@@ -571,11 +608,121 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<SystemDefaultRoleName, readonly str
     `${action('TRANSLATION_CREATE')}:owner`,
     `${action('TRANSLATION_UPDATE')}:owner`,
     `${action('TRANSLATION_DELETE')}:owner`,
+    // Billing — read own
+    `${action('BILLING_READ')}:owner`,
+    `${action('CREDIT_READ')}:owner`,
+    `${action('SUBSCRIPTION_READ')}:owner`,
+    `${action('REFERRAL_READ')}:owner`,
+  ],
+  [SYSTEM_DEFAULT_ROLES.VIP_USER]: [
+    // Legacy — keep existing permissions for backward compatibility
+    `${action('AGENT_CREATE')}:all`,
+    `${action('AGENT_READ')}:all`,
+    `${action('AGENT_UPDATE')}:owner`,
+    `${action('AGENT_DELETE')}:owner`,
+    `${action('AGENT_FORK')}:all`,
+    `${action('AGENT_PUBLISH')}:owner`,
+    `${action('GROUP_CREATE')}:owner`,
+    `${action('GROUP_READ')}:all`,
+    `${action('GROUP_UPDATE')}:owner`,
+    `${action('GROUP_DELETE')}:owner`,
+    `${action('GROUP_FORK')}:owner`,
+    `${action('GROUP_PUBLISH')}:owner`,
+    `${action('SESSION_READ')}:all`,
+    `${action('SESSION_CREATE')}:owner`,
+    `${action('SESSION_UPDATE')}:owner`,
+    `${action('SESSION_DELETE')}:owner`,
+    `${action('SESSION_GROUP_READ')}:all`,
+    `${action('SESSION_GROUP_CREATE')}:owner`,
+    `${action('SESSION_GROUP_UPDATE')}:owner`,
+    `${action('SESSION_GROUP_DELETE')}:owner`,
+    `${action('MESSAGE_READ')}:all`,
+    `${action('MESSAGE_CREATE')}:owner`,
+    `${action('MESSAGE_UPDATE')}:owner`,
+    `${action('MESSAGE_DELETE')}:owner`,
+    `${action('TOPIC_READ')}:all`,
+    `${action('TOPIC_CREATE')}:owner`,
+    `${action('TOPIC_UPDATE')}:owner`,
+    `${action('TOPIC_DELETE')}:owner`,
+    `${action('FILE_READ')}:all`,
+    `${action('FILE_UPLOAD')}:owner`,
+    `${action('FILE_UPDATE')}:owner`,
+    `${action('FILE_DELETE')}:owner`,
+    `${action('DOCUMENT_READ')}:all`,
+    `${action('DOCUMENT_CREATE')}:owner`,
+    `${action('DOCUMENT_UPDATE')}:owner`,
+    `${action('DOCUMENT_DELETE')}:owner`,
+    `${action('KNOWLEDGE_BASE_READ')}:all`,
+    `${action('KNOWLEDGE_BASE_CREATE')}:owner`,
+    `${action('KNOWLEDGE_BASE_UPDATE')}:owner`,
+    `${action('KNOWLEDGE_BASE_DELETE')}:owner`,
+    `${action('AI_MODEL_READ')}:all`,
+    `${action('AI_MODEL_INVOKE')}:all`,
+    `${action('AI_PROVIDER_READ')}:all`,
+    `${action('API_KEY_READ')}:owner`,
+    `${action('API_KEY_CREATE')}:owner`,
+    `${action('API_KEY_UPDATE')}:owner`,
+    `${action('API_KEY_DELETE')}:owner`,
+    `${action('USER_READ')}:all`,
+    `${action('USER_UPDATE')}:owner`,
+    `${action('TRANSLATION_READ')}:all`,
+    `${action('TRANSLATION_CREATE')}:owner`,
+    `${action('TRANSLATION_UPDATE')}:owner`,
+    `${action('TRANSLATION_DELETE')}:owner`,
   ],
   [SYSTEM_DEFAULT_ROLES.FREE_USER]: [
-    // Free users can only manage their own installed agents — no create/fork
+    // Agent — can use agents from Discover plus manage own installed
+    `${action('AGENT_READ')}:all`,
     `${action('AGENT_READ')}:owner`,
     `${action('AGENT_UPDATE')}:owner`,
     `${action('AGENT_DELETE')}:owner`,
+    // Session — basic chat
+    `${action('SESSION_READ')}:owner`,
+    `${action('SESSION_CREATE')}:owner`,
+    `${action('SESSION_UPDATE')}:owner`,
+    `${action('SESSION_DELETE')}:owner`,
+    // Message
+    `${action('MESSAGE_READ')}:owner`,
+    `${action('MESSAGE_CREATE')}:owner`,
+    // Topic
+    `${action('TOPIC_READ')}:owner`,
+    `${action('TOPIC_CREATE')}:owner`,
+    `${action('TOPIC_UPDATE')}:owner`,
+    `${action('TOPIC_DELETE')}:owner`,
+    // File — basic upload/management
+    `${action('FILE_READ')}:owner`,
+    `${action('FILE_UPLOAD')}:owner`,
+    `${action('FILE_UPDATE')}:owner`,
+    `${action('FILE_DELETE')}:owner`,
+    // Document
+    `${action('DOCUMENT_READ')}:owner`,
+    `${action('DOCUMENT_CREATE')}:owner`,
+    `${action('DOCUMENT_UPDATE')}:owner`,
+    `${action('DOCUMENT_DELETE')}:owner`,
+    // Knowledge Base
+    `${action('KNOWLEDGE_BASE_READ')}:owner`,
+    `${action('KNOWLEDGE_BASE_CREATE')}:owner`,
+    `${action('KNOWLEDGE_BASE_UPDATE')}:owner`,
+    `${action('KNOWLEDGE_BASE_DELETE')}:owner`,
+    // AI — use system default models, read providers
+    `${action('AI_MODEL_READ')}:all`,
+    `${action('AI_MODEL_INVOKE')}:all`,
+    `${action('AI_PROVIDER_READ')}:all`,
+    // API Key — own only (for external integrations)
+    `${action('API_KEY_READ')}:owner`,
+    `${action('API_KEY_CREATE')}:owner`,
+    `${action('API_KEY_UPDATE')}:owner`,
+    `${action('API_KEY_DELETE')}:owner`,
+    // User — manage own profile
+    `${action('USER_READ')}:all`,
+    `${action('USER_UPDATE')}:owner`,
+    // Translation
+    `${action('TRANSLATION_READ')}:owner`,
+    `${action('TRANSLATION_CREATE')}:owner`,
+    // Billing — read own
+    `${action('BILLING_READ')}:owner`,
+    `${action('CREDIT_READ')}:owner`,
+    `${action('SUBSCRIPTION_READ')}:owner`,
+    `${action('REFERRAL_READ')}:owner`,
   ],
 };

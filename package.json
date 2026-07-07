@@ -56,6 +56,8 @@
     "db:generate": "drizzle-kit generate && npm run workflow:dbml",
     "db:migrate": "cross-env MIGRATION_DB=1 tsx ./scripts/migrateServerDB/index.ts",
     "db:studio": "drizzle-kit studio",
+    "rbac:sync": "tsx scripts/sync-system-permissions.ts",
+    "rbac:sync:audit": "tsx scripts/sync-system-permissions.ts --audit",
     "db:visualize": "dbdocs build docs/development/database-schema.dbml --project lobe-chat",
     "desktop:build:all": "npm run desktop:build:main",
     "desktop:build:main": "npm run build:main --prefix=./apps/desktop",

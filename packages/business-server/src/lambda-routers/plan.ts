@@ -3,8 +3,18 @@ import { z } from 'zod';
 import { authedProcedure, router } from '@/libs/trpc/lambda';
 import { serverDatabase } from '@/libs/trpc/lambda/middleware';
 import { PaymentPlansModel } from '@/database/models/paymentPlans';
+import { adminGuardProcedure } from '@/business/server/trpc-middlewares/adminGuard';
 
-const adminProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
+const adminProcedure = adminGuardProcedure.use(async (opts) => {
+  const { ctx } = opts;
+  return opts.next({
+    ctx: {
+      paymentPlansModel: new PaymentPlansModel(ctx.serverDB),
+    },
+  });
+});
+
+const userProcedure = authedProcedure.use(serverDatabase).use(async (opts) => {
   const { ctx } = opts;
   return opts.next({
     ctx: {
@@ -34,10 +44,21 @@ const updateCreditConfigSchema = z.object({
   bonusRate: z.number().min(0).max(100).optional(),
   creditExpiryDays: z.number().int().min(0).optional(),
   referralRewardCredits: z.number().int().min(0).optional(),
+  defaultRegistrationCredits: z.number().int().min(0).optional(),
 });
 
 export const planRouter = router({
-  // ── Plans CRUD ──
+  // ── Public endpoints (user-facing) ────────────────
+  listPublicPlans: userProcedure.query(async ({ ctx }) => {
+    const plans = await ctx.paymentPlansModel.listPlans();
+    return plans.filter((p) => p.enabled);
+  }),
+
+  getPublicCreditConfig: userProcedure.query(async ({ ctx }) => {
+    return ctx.paymentPlansModel.getCreditConfig();
+  }),
+
+  // ── Plans CRUD (admin) ──
   listPlans: adminProcedure.query(async ({ ctx }) => {
     return ctx.paymentPlansModel.listPlans();
   }),

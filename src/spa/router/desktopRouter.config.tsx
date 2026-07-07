@@ -1117,6 +1117,8 @@ export const desktopRoutes: RouteObject[] = [
               { element: redirectElement('../settings/plans'), path: 'plans' },
               { element: redirectElement('../settings/usage'), path: 'usage' },
               { element: redirectElement('../settings/credits'), path: 'credits' },
+              { element: redirectElement('../settings/referral'), path: 'referral' },
+              { element: redirectElement('../settings/history'), path: 'history' },
               { element: redirectElement('../settings/billing'), path: 'billing' },
             ],
             path: 'billing',
