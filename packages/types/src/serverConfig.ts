@@ -74,6 +74,7 @@ export interface GlobalServerConfig {
   enableGatewayMode?: boolean;
   enableLobehubSkill?: boolean;
   enableMagicLink?: boolean;
+  enableMcpscope?: boolean;
   enableMarketTrustedClient?: boolean;
   enableUploadFileToServer?: boolean;
   enableVisualUnderstanding?: boolean;

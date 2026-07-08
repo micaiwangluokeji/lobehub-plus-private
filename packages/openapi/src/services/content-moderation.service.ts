@@ -23,18 +23,14 @@ export class ContentModerationService {
     this.db = db;
   }
 
-  async list(
-    request: ContentModerationListRequest,
-  ): Promise<ContentModerationListResponse> {
+  async list(request: ContentModerationListRequest): Promise<ContentModerationListResponse> {
     const conditions = [];
 
     if (request.userId) conditions.push(eq(contentModerationLogs.userId, request.userId));
     if (request.contentType)
       conditions.push(eq(contentModerationLogs.contentType, request.contentType));
     if (request.moderationResult)
-      conditions.push(
-        eq(contentModerationLogs.moderationResult, request.moderationResult),
-      );
+      conditions.push(eq(contentModerationLogs.moderationResult, request.moderationResult));
     if (request.status) conditions.push(eq(contentModerationLogs.status, request.status));
 
     const where = and(...conditions);
@@ -61,6 +57,29 @@ export class ContentModerationService {
     };
   }
 
+  async getById(id: string): Promise<ContentModerationLogItem | null> {
+    const [row] = await this.db
+      .select()
+      .from(contentModerationLogs)
+      .where(eq(contentModerationLogs.id, id))
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  async create(data: Record<string, unknown>): Promise<ContentModerationLogItem> {
+    const [row] = await this.db
+      .insert(contentModerationLogs)
+      .values({
+        ...data,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    return row;
+  }
+
   async update(
     id: string,
     request: UpdateContentModerationRequest,
@@ -79,5 +98,18 @@ export class ContentModerationService {
       .returning();
 
     return row ?? null;
+  }
+
+  async getStats(): Promise<Record<string, unknown>> {
+    const total = await this.db.select({ count: count() }).from(contentModerationLogs);
+    const pending = await this.db
+      .select({ count: count() })
+      .from(contentModerationLogs)
+      .where(eq(contentModerationLogs.status, 'pending'));
+
+    return {
+      total: Number(total[0]?.count ?? 0),
+      pending: Number(pending[0]?.count ?? 0),
+    };
   }
 }

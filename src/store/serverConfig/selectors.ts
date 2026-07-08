@@ -10,6 +10,7 @@ export const serverConfigSelectors = {
   enableComposio: (s: ServerConfigStore) => s.serverConfig.enableComposio || false,
   enableGatewayMode: (s: ServerConfigStore) => s.serverConfig.enableGatewayMode || false,
   enableLobehubSkill: (s: ServerConfigStore) => s.serverConfig.enableLobehubSkill || false,
+  enableMcpscope: (s: ServerConfigStore) => s.serverConfig.enableMcpscope || true,
   enableMagicLink: (s: ServerConfigStore) => s.serverConfig.enableMagicLink || false,
   enableMarketTrustedClient: (s: ServerConfigStore) =>
     s.serverConfig.enableMarketTrustedClient || false,

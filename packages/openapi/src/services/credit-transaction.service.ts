@@ -58,6 +58,34 @@ export class CreditTransactionService {
     };
   }
 
+  async getById(id: number): Promise<typeof creditTransactions.$inferSelect | null> {
+    const [row] = await this.db
+      .select()
+      .from(creditTransactions)
+      .where(eq(creditTransactions.id, id))
+      .limit(1);
+
+    return row ?? null;
+  }
+
+  async create(data: Record<string, unknown>): Promise<typeof creditTransactions.$inferSelect> {
+    const [row] = await this.db
+      .insert(creditTransactions)
+      .values({
+        ...data,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as any)
+      .returning();
+
+    return row;
+  }
+
+  async getUserBalance(userId: string): Promise<number> {
+    const model = new CreditTransactionsModel(this.db);
+    return model.getUserBalance(userId);
+  }
+
   async adjustCredits(
     request: AdjustCreditsRequest,
     operatorId: string,

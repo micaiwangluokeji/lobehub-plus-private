@@ -1,7 +1,7 @@
 export enum RecommendedSkillType {
   Builtin = 'builtin',
-  Composio = 'composio',
   Lobehub = 'lobehub',
+  Mcpscope = 'mcpscope',
 }
 
 export interface RecommendedSkillItem {
@@ -21,9 +21,12 @@ export const RECOMMENDED_SKILLS: RecommendedSkillItem[] = [
   { id: 'notion', type: RecommendedSkillType.Lobehub },
   { id: 'posthog', type: RecommendedSkillType.Lobehub },
   { id: 'twitter', type: RecommendedSkillType.Lobehub },
-  // Composio skills
-  { id: 'gmail', type: RecommendedSkillType.Composio },
-  { id: 'google-drive', type: RecommendedSkillType.Composio },
-  { id: 'google-calendar', type: RecommendedSkillType.Composio },
-  { id: 'slack', type: RecommendedSkillType.Composio },
+  // Mcpscope skills (China native services)
+  { id: 'feishu', type: RecommendedSkillType.Mcpscope },
+  { id: 'dingtalk', type: RecommendedSkillType.Mcpscope },
+  { id: 'wechatwork', type: RecommendedSkillType.Mcpscope },
+  { id: 'wechat-official', type: RecommendedSkillType.Mcpscope },
+  { id: 'xiaohongshu', type: RecommendedSkillType.Mcpscope },
+  { id: 'alipay', type: RecommendedSkillType.Mcpscope },
+  { id: 'baidu-search', type: RecommendedSkillType.Mcpscope },
 ];

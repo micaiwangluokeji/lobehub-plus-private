@@ -32,6 +32,57 @@ CreditTransactionsRoutes.get(
 );
 
 /**
+ * Get credit transaction by id
+ * GET /api/v1/credit-transactions/:id
+ */
+CreditTransactionsRoutes.get(
+  '/:id',
+  requireAuth,
+  requireAnyPermission(
+    getScopePermissions('CREDIT_READ', ['ALL']),
+    'You do not have permission to view credit transactions',
+  ),
+  async (c) => {
+    const controller = new CreditTransactionController();
+    return await controller.getById(c);
+  },
+);
+
+/**
+ * Create credit transaction
+ * POST /api/v1/credit-transactions
+ */
+CreditTransactionsRoutes.post(
+  '/',
+  requireAuth,
+  requireAnyPermission(
+    getScopePermissions('CREDIT_MANAGE', ['ALL']),
+    'You do not have permission to create credit transactions',
+  ),
+  async (c) => {
+    const controller = new CreditTransactionController();
+    return await controller.create(c);
+  },
+);
+
+/**
+ * Get user credit balance
+ * GET /api/v1/credit-transactions/balance
+ */
+CreditTransactionsRoutes.get(
+  '/balance',
+  requireAuth,
+  requireAnyPermission(
+    getScopePermissions('CREDIT_READ', ['ALL']),
+    'You do not have permission to view credit balance',
+  ),
+  async (c) => {
+    const controller = new CreditTransactionController();
+    return await controller.getUserBalance(c);
+  },
+);
+
+/**
  * Adjust user credits (admin adjustment)
  * POST /api/v1/credit-transactions/adjust
  */

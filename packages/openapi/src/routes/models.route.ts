@@ -20,7 +20,10 @@ const ModelRoutes = new Hono();
 ModelRoutes.get(
   '/',
   requireAuth,
-  requireAnyPermission(getAllScopePermissions('AI_MODEL_READ'), 'You do not have permission to view model list'),
+  requireAnyPermission(
+    getAllScopePermissions('AI_MODEL_READ'),
+    'You do not have permission to view model list',
+  ),
   zValidator('query', ModelsListQuerySchema),
   (c) => {
     const controller = new ModelController();
@@ -32,7 +35,10 @@ ModelRoutes.get(
 ModelRoutes.post(
   '/',
   requireAuth,
-  requireAnyPermission(getAllScopePermissions('AI_MODEL_CREATE'), 'You do not have permission to create a model'),
+  requireAnyPermission(
+    getAllScopePermissions('AI_MODEL_CREATE'),
+    'You do not have permission to create a model',
+  ),
   zValidator('json', CreateModelRequestSchema),
   (c) => {
     const controller = new ModelController();
@@ -44,7 +50,10 @@ ModelRoutes.post(
 ModelRoutes.get(
   '/:providerId/:modelId',
   requireAuth,
-  requireAnyPermission(getAllScopePermissions('AI_MODEL_READ'), 'You do not have permission to view model details'),
+  requireAnyPermission(
+    getAllScopePermissions('AI_MODEL_READ'),
+    'You do not have permission to view model details',
+  ),
   zValidator('param', ModelIdParamSchema),
   (c) => {
     const controller = new ModelController();
@@ -56,12 +65,30 @@ ModelRoutes.get(
 ModelRoutes.patch(
   '/:providerId/:modelId',
   requireAuth,
-  requireAnyPermission(getAllScopePermissions('AI_MODEL_UPDATE'), 'You do not have permission to update a model'),
+  requireAnyPermission(
+    getAllScopePermissions('AI_MODEL_UPDATE'),
+    'You do not have permission to update a model',
+  ),
   zValidator('param', ModelIdParamSchema),
   zValidator('json', UpdateModelRequestSchema),
   (c) => {
     const controller = new ModelController();
     return controller.handleUpdateModel(c);
+  },
+);
+
+// DELETE /api/v1/models/:providerId/:modelId - Delete a model
+ModelRoutes.delete(
+  '/:providerId/:modelId',
+  requireAuth,
+  requireAnyPermission(
+    getAllScopePermissions('AI_MODEL_DELETE'),
+    'You do not have permission to delete a model',
+  ),
+  zValidator('param', ModelIdParamSchema),
+  (c) => {
+    const controller = new ModelController();
+    return controller.handleDeleteModel(c);
   },
 );
 

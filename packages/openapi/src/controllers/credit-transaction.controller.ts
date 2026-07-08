@@ -26,6 +26,57 @@ export class CreditTransactionController extends BaseController {
     }
   }
 
+  async getById(c: Context): Promise<Response> {
+    try {
+      const { id } = this.getParams<{ id: string }>(c);
+
+      const db = await this.getDatabase();
+      const service = new CreditTransactionService(db);
+      const result = await service.getById(Number(id));
+
+      if (!result) {
+        return this.error(c, 'Credit transaction not found', 404);
+      }
+
+      return this.success(c, result, 'Credit transaction retrieved successfully');
+    } catch (error) {
+      return this.handleError(c, error);
+    }
+  }
+
+  async create(c: Context): Promise<Response> {
+    try {
+      const body = await c.req.json();
+
+      const db = await this.getDatabase();
+      const service = new CreditTransactionService(db);
+      const result = await service.create(body);
+
+      return this.success(c, result, 'Credit transaction created successfully', 201);
+    } catch (error) {
+      return this.handleError(c, error);
+    }
+  }
+
+  async getUserBalance(c: Context): Promise<Response> {
+    try {
+      const query = c.req.query();
+      const userId = query.userId;
+
+      if (!userId) {
+        return this.error(c, 'userId query parameter is required', 400);
+      }
+
+      const db = await this.getDatabase();
+      const service = new CreditTransactionService(db);
+      const balance = await service.getUserBalance(userId);
+
+      return this.success(c, { balance }, 'User balance retrieved successfully');
+    } catch (error) {
+      return this.handleError(c, error);
+    }
+  }
+
   async adjustCredits(c: Context): Promise<Response> {
     try {
       const request = await this.getBody<AdjustCreditsRequest>(c);

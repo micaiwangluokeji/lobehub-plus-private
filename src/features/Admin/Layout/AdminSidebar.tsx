@@ -17,6 +17,7 @@ import {
   Server,
   Settings,
   Shield,
+  ShieldCheck,
   Star,
   TrendingUp,
   Users,
@@ -64,6 +65,7 @@ const AdminSidebar = memo(() => {
       { icon: MessageSquare, label: t('nav.messages'), path: '/admin/messages' },
       { icon: FileText, label: t('nav.files'), path: '/admin/files' },
       { icon: Library, label: t('nav.knowledgeBases'), path: '/admin/knowledge-bases' },
+      { icon: ShieldCheck, label: t('nav.review'), path: '/admin/review' },
 
       // AI 管理
       { type: 'divider' },
@@ -104,7 +106,15 @@ const AdminSidebar = memo(() => {
 
   return (
     <NavPanelPortal navKey="admin">
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', padding: '8px 0' }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          overflowY: 'auto',
+          padding: '8px 0',
+        }}
+      >
         <div
           style={{
             fontSize: 16,
@@ -159,9 +169,7 @@ const AdminSidebar = memo(() => {
                 gap: 10,
                 padding: '10px 20px',
                 cursor: 'pointer',
-                color: active
-                  ? 'var(--ant-color-primary)'
-                  : 'var(--ant-color-text-secondary)',
+                color: active ? 'var(--ant-color-primary)' : 'var(--ant-color-text-secondary)',
                 background: active ? 'var(--ant-color-primary-bg)' : 'transparent',
                 borderRadius: 0,
                 fontSize: 14,

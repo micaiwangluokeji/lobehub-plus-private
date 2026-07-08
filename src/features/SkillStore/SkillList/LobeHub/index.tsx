@@ -1,6 +1,6 @@
 'use client';
 
-import { COMPOSIO_APP_TYPES, LOBEHUB_SKILL_PROVIDERS } from '@lobechat/const';
+import { LOBEHUB_SKILL_PROVIDERS, MCOPSCOPE_APP_TYPES } from '@lobechat/const';
 import { type BuiltinSkill, type LobeToolMeta } from '@lobechat/types';
 import isEqual from 'fast-deep-equal';
 import { memo, useCallback, useMemo } from 'react';
@@ -9,15 +9,14 @@ import { useTranslation } from 'react-i18next';
 import {
   createBuiltinAgentSkillDetailModal,
   createBuiltinSkillDetailModal,
-  createComposioSkillDetailModal,
   createLobehubSkillDetailModal,
 } from '@/features/SkillStore/SkillDetail';
 import { serverConfigSelectors, useServerConfigStore } from '@/store/serverConfig';
 import { useToolStore } from '@/store/tool';
 import { type ToolStoreState } from '@/store/tool/initialState';
-import { composioStoreSelectors, lobehubSkillStoreSelectors } from '@/store/tool/selectors';
-import { ComposioServerStatus } from '@/store/tool/slices/composioStore';
+import { lobehubSkillStoreSelectors, mcpscopeStoreSelectors } from '@/store/tool/selectors';
 import { LobehubSkillStatus } from '@/store/tool/slices/lobehubSkillStore/types';
+import { McpscopeServerStatus } from '@/store/tool/slices/mcpscopeStore';
 
 import BuiltinItem from '../Builtin/Item';
 import Empty from '../Empty';
@@ -44,20 +43,20 @@ const getBuiltinToolsOnly = (s: ToolStoreState): LobeToolMeta[] => {
 export const LobeHubList = memo<LobeHubListProps>(({ keywords }) => {
   const { t } = useTranslation('setting');
   const isLobehubSkillEnabled = useServerConfigStore(serverConfigSelectors.enableLobehubSkill);
-  const isComposioEnabled = useServerConfigStore(serverConfigSelectors.enableComposio);
+  const isMcpscopeEnabled = useServerConfigStore(serverConfigSelectors.enableMcpscope);
   const allLobehubSkillServers = useToolStore(lobehubSkillStoreSelectors.getServers, isEqual);
-  const allComposioServers = useToolStore(composioStoreSelectors.getServers, isEqual);
+  const allMcpscopeServers = useToolStore(mcpscopeStoreSelectors.getServers, isEqual);
   // Use custom selector to get only actual builtin tools (not Composio)
   const builtinTools = useToolStore(getBuiltinToolsOnly, isEqual);
   const builtinSkills = useToolStore((s) => s.builtinSkills, isEqual);
 
-  const [useFetchLobehubSkillConnections, useFetchUserComposioConnections] = useToolStore((s) => [
+  const [useFetchLobehubSkillConnections, useFetchUserMcpscopeConnections] = useToolStore((s) => [
     s.useFetchLobehubSkillConnections,
-    s.useFetchUserComposioConnections,
+    s.useFetchUserMcpscopeConnections,
   ]);
 
   useFetchLobehubSkillConnections(isLobehubSkillEnabled);
-  useFetchUserComposioConnections(isComposioEnabled);
+  useFetchUserMcpscopeConnections(isMcpscopeEnabled);
 
   const getLobehubSkillServerByProvider = useCallback(
     (providerId: string) => {
@@ -66,17 +65,17 @@ export const LobeHubList = memo<LobeHubListProps>(({ keywords }) => {
     [allLobehubSkillServers],
   );
 
-  const getComposioServerByIdentifier = useCallback(
+  const getMcpscopeServerByIdentifier = useCallback(
     (identifier: string) => {
-      return allComposioServers.find((server) => server.identifier === identifier);
+      return allMcpscopeServers.find((server) => server.identifier === identifier);
     },
-    [allComposioServers],
+    [allMcpscopeServers],
   );
 
   const filteredItems = useMemo(() => {
     const items: Array<
       | { provider: (typeof LOBEHUB_SKILL_PROVIDERS)[number]; type: 'lobehub' }
-      | { serverType: (typeof COMPOSIO_APP_TYPES)[number]; type: 'composio' }
+      | { serverType: (typeof MCOPSCOPE_APP_TYPES)[number]; type: 'mcpscope' }
       | { skill: BuiltinSkill; type: 'builtinAgentSkill' }
       | { tool: LobeToolMeta; type: 'builtin' }
     > = [];
@@ -98,10 +97,10 @@ export const LobeHubList = memo<LobeHubListProps>(({ keywords }) => {
       }
     }
 
-    // Add Composio skills
-    if (isComposioEnabled) {
-      for (const serverType of COMPOSIO_APP_TYPES) {
-        items.push({ serverType, type: 'composio' });
+    // Add Mcpscope skills
+    if (isMcpscopeEnabled) {
+      for (const serverType of MCOPSCOPE_APP_TYPES) {
+        items.push({ serverType, type: 'mcpscope' });
       }
     }
 
@@ -123,7 +122,7 @@ export const LobeHubList = memo<LobeHubListProps>(({ keywords }) => {
       const label = item.type === 'lobehub' ? item.provider.label : item.serverType.label;
       return label.toLowerCase().includes(lowerKeywords);
     });
-  }, [keywords, isLobehubSkillEnabled, isComposioEnabled, builtinTools, builtinSkills]);
+  }, [keywords, isLobehubSkillEnabled, isMcpscopeEnabled, builtinTools, builtinSkills]);
 
   const hasSearchKeywords = Boolean(keywords && keywords.trim());
 
@@ -189,8 +188,8 @@ export const LobeHubList = memo<LobeHubListProps>(({ keywords }) => {
               />
             );
           }
-          const server = getComposioServerByIdentifier(item.serverType.identifier);
-          const isConnected = server?.status === ComposioServerStatus.ACTIVE;
+          const server = getMcpscopeServerByIdentifier(item.serverType.identifier);
+          const isConnected = server?.status === McpscopeServerStatus.ACTIVE;
           return (
             <Item
               description={item.serverType.description}
@@ -200,13 +199,8 @@ export const LobeHubList = memo<LobeHubListProps>(({ keywords }) => {
               key={item.serverType.identifier}
               label={item.serverType.label}
               serverName={item.serverType.appSlug}
-              type="composio"
-              onOpenDetail={() =>
-                createComposioSkillDetailModal({
-                  identifier: item.serverType.identifier,
-                  serverName: item.serverType.appSlug,
-                })
-              }
+              type="mcpscope"
+              onOpenDetail={() => {}}
             />
           );
         })}

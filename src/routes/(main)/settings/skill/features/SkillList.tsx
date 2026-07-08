@@ -1,12 +1,12 @@
 'use client';
 
 import {
-  COMPOSIO_APP_TYPES,
-  type ComposioAppType,
-  getComposioAppByIdentifier,
   getLobehubSkillProviderById,
   LOBEHUB_SKILL_PROVIDERS,
   type LobehubSkillProviderType,
+  MCOPSCOPE_APP_TYPES,
+  type McpscopeAppType,
+  getMcpscopeAppByIdentifier,
   RECOMMENDED_SKILLS,
   RecommendedSkillType,
 } from '@lobechat/const';
@@ -27,20 +27,20 @@ import { useToolStore } from '@/store/tool';
 import {
   agentSkillsSelectors,
   builtinToolSelectors,
-  composioStoreSelectors,
   lobehubSkillStoreSelectors,
+  mcpscopeStoreSelectors,
   pluginSelectors,
 } from '@/store/tool/selectors';
-import { ComposioServerStatus } from '@/store/tool/slices/composioStore';
 import { connectorSelectors } from '@/store/tool/slices/connector';
 import { LobehubSkillStatus } from '@/store/tool/slices/lobehubSkillStore/types';
+import { McpscopeServerStatus } from '@/store/tool/slices/mcpscopeStore';
 import { type LobeToolType } from '@/types/tool/tool';
 
 import AgentSkillItem from './AgentSkillItem';
 import BuiltinSkillItem from './BuiltinSkillItem';
-import ComposioSkillItem from './ComposioSkillItem';
 import LobehubSkillItem from './LobehubSkillItem';
 import McpSkillItem from './McpSkillItem';
+import McpscopeSkillItem from './McpscopeSkillItem';
 import type { ToolDetailType } from './SkillDetail';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
@@ -94,9 +94,9 @@ const SkillList = memo<SkillListProps>(
     const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
     const isLobehubSkillEnabled = useServerConfigStore(serverConfigSelectors.enableLobehubSkill);
-    const isComposioEnabled = useServerConfigStore(serverConfigSelectors.enableComposio);
+    const isMcpscopeEnabled = useServerConfigStore(serverConfigSelectors.enableMcpscope);
     const allLobehubSkillServers = useToolStore(lobehubSkillStoreSelectors.getServers, isEqual);
-    const allComposioServers = useToolStore(composioStoreSelectors.getServers, isEqual);
+    const allMcpscopeServers = useToolStore(mcpscopeStoreSelectors.getServers, isEqual);
     const installedPluginList = useToolStore(pluginSelectors.installedPluginMetaList, isEqual);
     const marketAgentSkills = useToolStore(agentSkillsSelectors.getMarketAgentSkills, isEqual);
     const userAgentSkills = useToolStore(agentSkillsSelectors.getUserAgentSkills, isEqual);
@@ -112,12 +112,12 @@ const SkillList = memo<SkillListProps>(
 
     const [
       useFetchLobehubSkillConnections,
-      useFetchUserComposioConnections,
+      useFetchUserMcpscopeConnections,
       useFetchAgentSkills,
       useFetchUninstalledBuiltinTools,
     ] = useToolStore((s) => [
       s.useFetchLobehubSkillConnections,
-      s.useFetchUserComposioConnections,
+      s.useFetchUserMcpscopeConnections,
       s.useFetchAgentSkills,
       s.useFetchUninstalledBuiltinTools,
     ]);
@@ -127,14 +127,14 @@ const SkillList = memo<SkillListProps>(
     // of a fake-empty list (each hook syncs into the store only on success —
     // LOBE-11124).
     const lobehubSkillsSWR = useFetchLobehubSkillConnections(isLobehubSkillEnabled);
-    const composioSWR = useFetchUserComposioConnections(isComposioEnabled);
+    const mcpscopeSWR = useFetchUserMcpscopeConnections(isMcpscopeEnabled);
     const agentSkillsSWR = useFetchAgentSkills(true);
     const builtinToolsSWR = useFetchUninstalledBuiltinTools(true);
     const skillsError =
-      lobehubSkillsSWR.error ?? composioSWR.error ?? agentSkillsSWR.error ?? builtinToolsSWR.error;
+      lobehubSkillsSWR.error ?? mcpscopeSWR.error ?? agentSkillsSWR.error ?? builtinToolsSWR.error;
     const reloadSkills = () => {
       void lobehubSkillsSWR.mutate();
-      void composioSWR.mutate();
+      void mcpscopeSWR.mutate();
       void agentSkillsSWR.mutate();
       void builtinToolsSWR.mutate();
     };
@@ -149,8 +149,8 @@ const SkillList = memo<SkillListProps>(
       return allLobehubSkillServers.find((server) => server.identifier === providerId);
     };
 
-    const getComposioServerByIdentifier = (identifier: string) => {
-      return allComposioServers.find((server) => server.identifier === identifier);
+    const getMcpscopeServerByIdentifier = (identifier: string) => {
+      return allMcpscopeServers.find((server) => server.identifier === identifier);
     };
 
     const getBuiltinToolByIdentifier = (identifier: string) => {
@@ -162,7 +162,7 @@ const SkillList = memo<SkillListProps>(
     };
 
     // Separate skills into three categories:
-    // 1. Integrations (Builtin, LobeHub and Composio skills)
+    // 1. Integrations (Builtin, LobeHub and Mcpscope skills)
     // 2. Community MCP Tools (type === 'plugin')
     // 3. Custom MCP Tools (type === 'customPlugin')
     const { integrations, communityMCPs, customMCPs } = useMemo(() => {
@@ -170,7 +170,7 @@ const SkillList = memo<SkillListProps>(
         | { builtinAgentSkill: BuiltinSkill; type: 'builtinAgent' }
         | { builtinTool: LobeBuiltinTool; type: 'builtin' }
         | { provider: LobehubSkillProviderType; type: 'lobehub' }
-        | { serverType: ComposioAppType; type: 'composio' };
+        | { serverType: McpscopeAppType; type: 'mcpscope' };
 
       let integrationItems: IntegrationItem[] = [];
 
@@ -181,7 +181,7 @@ const SkillList = memo<SkillListProps>(
 
       const addedBuiltinIds = new Set<string>();
       const addedLobehubIds = new Set<string>();
-      const addedComposioIds = new Set<string>();
+      const addedMcpscopeIds = new Set<string>();
 
       // If RECOMMENDED_SKILLS is configured, use it to build the list
       if (RECOMMENDED_SKILLS.length > 0) {
@@ -198,11 +198,11 @@ const SkillList = memo<SkillListProps>(
               integrationItems.push({ provider, type: 'lobehub' });
               addedLobehubIds.add(skill.id);
             }
-          } else if (skill.type === RecommendedSkillType.Composio && isComposioEnabled) {
-            const serverType = getComposioAppByIdentifier(skill.id);
+          } else if (skill.type === RecommendedSkillType.Mcpscope && isMcpscopeEnabled) {
+            const serverType = getMcpscopeAppByIdentifier(skill.id);
             if (serverType) {
-              integrationItems.push({ serverType, type: 'composio' });
-              addedComposioIds.add(skill.id);
+              integrationItems.push({ serverType, type: 'mcpscope' });
+              addedMcpscopeIds.add(skill.id);
             }
           }
         }
@@ -231,14 +231,14 @@ const SkillList = memo<SkillListProps>(
           }
         }
 
-        // Also add every other Composio app so users can discover and connect
+        // Also add every other Mcpscope app so users can discover and connect
         // integrations beyond the curated RECOMMENDED_SKILLS set — otherwise an
-        // app like Jira never appears until it's already connected.
-        if (isComposioEnabled) {
-          for (const serverType of COMPOSIO_APP_TYPES) {
-            if (!addedComposioIds.has(serverType.identifier)) {
-              integrationItems.push({ serverType, type: 'composio' });
-              addedComposioIds.add(serverType.identifier);
+        // app like Feishu never appears until it's already connected.
+        if (isMcpscopeEnabled) {
+          for (const serverType of MCOPSCOPE_APP_TYPES) {
+            if (!addedMcpscopeIds.has(serverType.identifier)) {
+              integrationItems.push({ serverType, type: 'mcpscope' });
+              addedMcpscopeIds.add(serverType.identifier);
             }
           }
         }
@@ -257,21 +257,21 @@ const SkillList = memo<SkillListProps>(
           }
         }
 
-        // Add composio skills
-        if (isComposioEnabled) {
-          for (const serverType of COMPOSIO_APP_TYPES) {
-            integrationItems.push({ serverType, type: 'composio' });
+        // Add mcpscope skills
+        if (isMcpscopeEnabled) {
+          for (const serverType of MCOPSCOPE_APP_TYPES) {
+            integrationItems.push({ serverType, type: 'mcpscope' });
           }
         }
 
-        // Filter integrations: show all builtin and lobehub skills, but only connected composio
+        // Filter integrations: show all builtin and lobehub skills, but only connected mcpscope
         integrationItems = integrationItems.filter((item) => {
           if (item.type === 'builtinAgent' || item.type === 'builtin' || item.type === 'lobehub') {
             return true;
           }
           return (
-            getComposioServerByIdentifier(item.serverType.identifier)?.status ===
-            ComposioServerStatus.ACTIVE
+            getMcpscopeServerByIdentifier(item.serverType.identifier)?.status ===
+            McpscopeServerStatus.ACTIVE
           );
         });
       }
@@ -291,10 +291,10 @@ const SkillList = memo<SkillListProps>(
               LobehubSkillStatus.CONNECTED
             );
           }
-          case 'composio': {
+          case 'mcpscope': {
             return (
-              getComposioServerByIdentifier(item.serverType.identifier)?.status ===
-              ComposioServerStatus.ACTIVE
+              getMcpscopeServerByIdentifier(item.serverType.identifier)?.status ===
+              McpscopeServerStatus.ACTIVE
             );
           }
         }
@@ -320,9 +320,9 @@ const SkillList = memo<SkillListProps>(
     }, [
       installedPluginList,
       isLobehubSkillEnabled,
-      isComposioEnabled,
+      isMcpscopeEnabled,
       allLobehubSkillServers,
-      allComposioServers,
+      allMcpscopeServers,
       allBuiltinTools,
       uninstalledBuiltinTools,
       builtinSkills,
@@ -422,7 +422,7 @@ const SkillList = memo<SkillListProps>(
     const builtinToolItems = integrations.filter((i) => i.type === 'builtin');
     const builtinSkillItems = integrations.filter((i) => i.type === 'builtinAgent');
     const communitySkillItems = integrations.filter(
-      (i) => i.type === 'lobehub' || i.type === 'composio',
+      (i) => i.type === 'lobehub' || i.type === 'mcpscope',
     );
 
     const toggleSection = (key: string) => {
@@ -512,7 +512,7 @@ const SkillList = memo<SkillListProps>(
             }),
           )}
 
-        {/* Connector view: Lobehub/Composio OAuth connectors */}
+        {/* Connector view: Lobehub/Mcpscope OAuth connectors */}
         {hasCommunityConnectors &&
           renderSection(
             'communityConnectors',
@@ -533,12 +533,11 @@ const SkillList = memo<SkillListProps>(
                 );
               }
               return (
-                <ComposioSkillItem
+                <McpscopeSkillItem
                   isSelected={selectedIdentifier === item.serverType.identifier}
                   key={item.serverType.identifier}
-                  server={getComposioServerByIdentifier(item.serverType.identifier)}
+                  server={getMcpscopeServerByIdentifier(item.serverType.identifier)}
                   serverType={item.serverType}
-                  onDelete={onDeleteSelected}
                   onSelect={
                     onSelect ? () => onSelect(item.serverType.identifier, 'plugin') : undefined
                   }

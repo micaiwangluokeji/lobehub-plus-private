@@ -20,7 +20,7 @@ interface ItemProps {
   label: string;
   onOpenDetail?: () => void;
   serverName?: string;
-  type: 'composio' | 'lobehub';
+  type: 'composio' | 'lobehub' | 'mcpscope';
 }
 
 const Item = memo<ItemProps>(

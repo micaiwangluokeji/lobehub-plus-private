@@ -9,6 +9,7 @@ export default {
   'nav.messages': '消息管理',
   'nav.files': '文件管理',
   'nav.knowledgeBases': '知识库管理',
+  'nav.review': '发布审核',
   'nav.models': '模型管理',
   'nav.providers': '供应商管理',
   'nav.apiKeys': 'API Key 管理',

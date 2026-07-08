@@ -813,6 +813,13 @@ export const desktopRoutes: RouteObject[] = [
           },
           {
             element: dynamicElement(
+              () => import('@/routes/(main)/admin/review'),
+              'Desktop > Admin > Review',
+            ),
+            path: 'review',
+          },
+          {
+            element: dynamicElement(
               () => import('@/routes/(main)/admin/api-keys'),
               'Desktop > Admin > API Keys',
             ),

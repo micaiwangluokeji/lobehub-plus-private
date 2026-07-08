@@ -270,4 +270,33 @@ export class ModelService extends BaseService {
       this.handleServiceError(error, '更新模型');
     }
   }
+
+  /**
+   * Delete a model
+   */
+  async deleteModel(providerId: string, modelId: string): ServiceResult<{ success: boolean }> {
+    this.log('info', '删除模型', { modelId, providerId, userId: this.userId });
+
+    try {
+      const permissionResult = await this.resolveOperationPermission('AI_MODEL_DELETE');
+      if (!permissionResult.isPermitted) {
+        throw this.createAuthorizationError(permissionResult.message || '无权删除模型');
+      }
+
+      const conditions = [eq(aiModels.providerId, providerId), eq(aiModels.id, modelId)];
+      const permissionWhere = this.buildPermissionWhere(aiModels, permissionResult.condition);
+      if (permissionWhere) conditions.push(permissionWhere);
+
+      const existingModel = await this.db.query.aiModels.findFirst({ where: and(...conditions) });
+      if (!existingModel) {
+        throw this.createNotFoundError(`模型 ${providerId}/${modelId} 不存在`);
+      }
+
+      await this.db.delete(aiModels).where(and(...conditions));
+
+      return { success: true };
+    } catch (error) {
+      this.handleServiceError(error, '删除模型');
+    }
+  }
 }

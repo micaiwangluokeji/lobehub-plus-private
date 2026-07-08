@@ -50,20 +50,20 @@ class AdminModelService extends AdminApiBase {
     });
   }
 
-  async getById(id: string) {
-    return this.get<AdminModel>(`/models/${id}`);
+  async getById(providerId: string, modelId: string) {
+    return this.get<AdminModel>(`/models/${providerId}/${modelId}`);
   }
 
   async create(params: CreateModelParams) {
     return this.post<AdminModel>('/models', params);
   }
 
-  async update(id: string, params: UpdateModelParams) {
-    return this.patch<AdminModel>(`/models/${id}`, params);
+  async update(providerId: string, modelId: string, params: UpdateModelParams) {
+    return this.patch<AdminModel>(`/models/${providerId}/${modelId}`, params);
   }
 
-  async remove(id: string) {
-    return super.delete(`/models/${id}`);
+  async remove(providerId: string, modelId: string) {
+    return super.delete(`/models/${providerId}/${modelId}`);
   }
 }
 

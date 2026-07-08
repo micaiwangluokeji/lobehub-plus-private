@@ -15,6 +15,7 @@ import { type AgentSkillsAction, createAgentSkillsSlice } from './slices/agentSk
 import { type BuiltinToolAction, createBuiltinToolSlice } from './slices/builtin';
 import { type ComposioStoreAction, createComposioStoreSlice } from './slices/composioStore';
 import { type ConnectorAction, createConnectorSlice } from './slices/connector';
+import { type McpscopeStoreAction, createMcpscopeStoreSlice } from './slices/mcpscopeStore';
 import { createCustomPluginSlice, type CustomPluginAction } from './slices/customPlugin';
 import {
   createLobehubSkillStoreSlice,
@@ -32,6 +33,7 @@ export type ToolStore = ToolStoreState &
   BuiltinToolAction &
   PluginMCPStoreAction &
   ComposioStoreAction &
+  McpscopeStoreAction &
   LobehubSkillStoreAction &
   AgentSkillsAction &
   AgentDocumentSkillsAction &
@@ -43,6 +45,7 @@ type ToolStoreAction = ConnectorAction &
   BuiltinToolAction &
   PluginMCPStoreAction &
   ComposioStoreAction &
+  McpscopeStoreAction &
   LobehubSkillStoreAction &
   AgentSkillsAction &
   AgentDocumentSkillsAction &
@@ -63,6 +66,7 @@ const createStore: StateCreator<ToolStore, [['zustand/devtools', never]]> = (
     createBuiltinToolSlice(...parameters),
     createMCPPluginStoreSlice(...parameters),
     createComposioStoreSlice(...parameters),
+    createMcpscopeStoreSlice(...parameters),
     createLobehubSkillStoreSlice(...parameters),
     createAgentSkillsSlice(...parameters),
     createAgentDocumentSkillsSlice(...parameters),

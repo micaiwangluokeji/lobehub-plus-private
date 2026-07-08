@@ -87,4 +87,22 @@ export class ModelController extends BaseController {
       return this.handleError(c, error);
     }
   }
+
+  /**
+   * Deletes a model
+   * DELETE /api/v1/models/:providerId/:modelId
+   */
+  async handleDeleteModel(c: Context) {
+    try {
+      const { providerId, modelId } = this.getParams<{ modelId: string; providerId: string }>(c);
+
+      const db = await this.getDatabase();
+      const modelService = new ModelService(db, this.getUserId(c), this.getWorkspaceId(c));
+      const result = await modelService.deleteModel(providerId, modelId);
+
+      return this.success(c, result, 'Model deleted successfully');
+    } catch (error) {
+      return this.handleError(c, error);
+    }
+  }
 }

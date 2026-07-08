@@ -24,27 +24,24 @@ const ModelList = memo(() => {
   const [providers, setProviders] = useState<AdminProvider[]>([]);
   const [providerFilter, setProviderFilter] = useState<string | undefined>(undefined);
 
-  const fetchData = useCallback(
-    async (p: number, ps: number, kw: string, pid?: string) => {
-      setLoading(true);
-      try {
-        const res = await adminModelService.list({
-          keyword: kw,
-          page: p,
-          pageSize: ps,
-          providerId: pid,
-        });
-        const body = res as unknown as {
-          data: { total: number; models: AdminModel[] };
-        };
-        setData(body.data.models);
-        setTotal(body.data.total);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [],
-  );
+  const fetchData = useCallback(async (p: number, ps: number, kw: string, pid?: string) => {
+    setLoading(true);
+    try {
+      const res = await adminModelService.list({
+        keyword: kw,
+        page: p,
+        pageSize: ps,
+        providerId: pid,
+      });
+      const body = res as unknown as {
+        data: { total: number; models: AdminModel[] };
+      };
+      setData(body.data.models);
+      setTotal(body.data.total);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const fetchProviders = useCallback(async () => {
     try {
@@ -81,7 +78,7 @@ const ModelList = memo(() => {
   const handleToggleEnabled = useCallback(
     async (model: AdminModel, checked: boolean) => {
       try {
-        await adminModelService.update(model.id, { enabled: checked });
+        await adminModelService.update(model.providerId, model.id, { enabled: checked });
         message.success(t('actions.save') + ' ' + t('actions.confirm'));
         fetchData(page, pageSize, keyword, providerFilter);
       } catch {}
@@ -90,9 +87,9 @@ const ModelList = memo(() => {
   );
 
   const handleDelete = useCallback(
-    async (id: string) => {
+    async (record: AdminModel) => {
       try {
-        await adminModelService.remove(id);
+        await adminModelService.remove(record.providerId, record.id);
         message.success(t('actions.delete') + ' ' + t('actions.confirm'));
         fetchData(page, pageSize, keyword, providerFilter);
       } catch {}
@@ -154,9 +151,7 @@ const ModelList = memo(() => {
             key: 'provider',
             render: (providerId: string) => {
               const provider = providerMap[providerId];
-              return (
-                <StatusTag status="enabled" text={provider?.name || providerId} />
-              );
+              return <StatusTag status="enabled" text={provider?.name || providerId} />;
             },
             title: t('models.columns.provider'),
           },

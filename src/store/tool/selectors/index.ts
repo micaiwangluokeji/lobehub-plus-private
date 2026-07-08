@@ -8,5 +8,6 @@ export { composioStoreSelectors } from '../slices/composioStore/selectors';
 export { customPluginSelectors } from '../slices/customPlugin/selectors';
 export { lobehubSkillStoreSelectors } from '../slices/lobehubSkillStore/selectors';
 export { mcpStoreSelectors } from '../slices/mcpStore/selectors';
+export { mcpscopeStoreSelectors } from '../slices/mcpscopeStore/selectors';
 export { pluginSelectors } from '../slices/plugin/selectors';
 export { toolSelectors } from './tool';

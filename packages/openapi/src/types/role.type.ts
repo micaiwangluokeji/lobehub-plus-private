@@ -61,7 +61,7 @@ export type CreateRoleRequest = {
 
 export const CreateRoleRequestSchema = z.object({
   description: z.string().nullish(),
-  displayName: z.string().min(1, 'Display name cannot be empty'),
+  displayName: z.string().min(1, 'Display name cannot be empty').nullish(),
   isActive: z.boolean().nullish().default(true),
   isSystem: z.boolean().nullish().default(false),
   name: z.string().min(1, 'Role name cannot be empty'),

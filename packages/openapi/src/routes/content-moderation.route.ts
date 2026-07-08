@@ -26,6 +26,34 @@ ContentModerationRoutes.get(
 );
 
 /**
+ * Get content moderation log by id
+ * GET /api/v1/content-moderation/:id
+ */
+ContentModerationRoutes.get(
+  '/:id',
+  requireAuth,
+  zValidator('param', ContentModerationIdParamSchema),
+  async (c) => {
+    const contentModerationController = new ContentModerationController();
+    return await contentModerationController.getById(c);
+  },
+);
+
+/**
+ * Create content moderation log
+ * POST /api/v1/content-moderation
+ */
+ContentModerationRoutes.post(
+  '/',
+  requireAuth,
+  zValidator('json', ContentModerationListRequestSchema.partial()),
+  async (c) => {
+    const contentModerationController = new ContentModerationController();
+    return await contentModerationController.create(c);
+  },
+);
+
+/**
  * Update content moderation log status and moderation result
  * PATCH /api/v1/content-moderation/:id
  */
@@ -39,5 +67,29 @@ ContentModerationRoutes.patch(
     return await contentModerationController.update(c);
   },
 );
+
+/**
+ * Update content moderation log status (compatible with POST /:id/status)
+ * POST /api/v1/content-moderation/:id/status
+ */
+ContentModerationRoutes.post(
+  '/:id/status',
+  requireAuth,
+  zValidator('param', ContentModerationIdParamSchema),
+  zValidator('json', UpdateContentModerationRequestSchema),
+  async (c) => {
+    const contentModerationController = new ContentModerationController();
+    return await contentModerationController.update(c);
+  },
+);
+
+/**
+ * Get content moderation stats
+ * GET /api/v1/content-moderation/stats
+ */
+ContentModerationRoutes.get('/stats', requireAuth, async (c) => {
+  const contentModerationController = new ContentModerationController();
+  return await contentModerationController.getModerationStats(c);
+});
 
 export default ContentModerationRoutes;
