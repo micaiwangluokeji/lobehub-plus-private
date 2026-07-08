@@ -509,6 +509,11 @@ export const toolKeys = {
     'tool:lobehubSkillTools',
     provider,
   ]),
+  mcpscopeAppTools: def('tool:mcpscopeAppTools', (appSlug: string) => [
+    'tool:mcpscopeAppTools',
+    appSlug,
+  ]),
+  mcpscopeConnections: def('tool:mcpscopeConnections', () => ['tool:mcpscopeConnections']),
   mcpPluginList: def('tool:mcpPluginList', (locale: string, params: unknown) => [
     'tool:mcpPluginList',
     locale,
