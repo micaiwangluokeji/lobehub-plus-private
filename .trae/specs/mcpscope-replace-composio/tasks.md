@@ -1,6 +1,6 @@
 # 魔搭 MCP 替代 Composio - 实现计划
 
-## [ ] Task 1: 创建魔搭 MCP 服务常量定义
+## [x] Task 1: 创建魔搭 MCP 服务常量定义
 
 - **Priority**: high
 - **Depends On**: None
@@ -14,7 +14,7 @@
   - `human-judgment` TR-1.2: 检查每个服务的配置是否完整（identifier、label、icon、description）
 - **Notes**: 需要确认魔搭 MCP 广场上各服务的具体 SSE URL
 
-## [ ] Task 2: 创建魔搭 MCP Store 切片
+## [x] Task 2: 创建魔搭 MCP Store 切片
 
 - **Priority**: high
 - **Depends On**: Task 1
@@ -29,7 +29,7 @@
   - `human-judgment` TR-2.2: 检查状态管理逻辑是否完整（连接、断开、刷新）
 - **Notes**: 参考 composioStore 的实现结构
 
-## [ ] Task 3: 创建魔搭 MCP 服务组件
+## [x] Task 3: 创建魔搭 MCP 服务组件
 
 - **Priority**: high
 - **Depends On**: Task 1, Task 2
@@ -44,7 +44,7 @@
   - `human-judgment` TR-3.3: 检查权限控制是否正确（无权限时按钮禁用）
 - **Notes**: 需要实现 API Key 输入对话框
 
-## [ ] Task 4: 更新 SkillList 组件，替换 Composio 为魔搭 MCP
+## [x] Task 4: 更新 SkillList 组件，替换 Composio 为魔搭 MCP
 
 - **Priority**: high
 - **Depends On**: Task 1, Task 2, Task 3
@@ -59,7 +59,7 @@
   - `human-judgment` TR-4.2: 检查技能商店弹窗是否显示魔搭 MCP 服务
 - **Notes**: 需要同步更新两处的 SkillList 使用
 
-## [ ] Task 5: 更新技能商店内容组件
+## [x] Task 5: 更新技能商店内容组件
 
 - **Priority**: high
 - **Depends On**: Task 1, Task 2, Task 3
@@ -73,7 +73,7 @@
   - `human-judgment` TR-5.2: 检查搜索功能是否正常工作
 - **Notes**: 需要确保与 settings/skill 页面保持一致
 
-## [ ] Task 6: 创建魔搭 MCP 后端路由
+## [x] Task 6: 创建魔搭 MCP 后端路由
 
 - **Priority**: medium
 - **Depends On**: Task 1
@@ -116,7 +116,7 @@
   - `human-judgment` TR-8.2: 检查页面显示是否正确
 - **Notes**: 需要添加每个服务的名称、描述等翻译
 
-## [ ] Task 9: 测试和验证
+## [x] Task 9: 测试和验证
 
 - **Priority**: high
 - **Depends On**: All

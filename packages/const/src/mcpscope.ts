@@ -1,19 +1,9 @@
-import type { IconType } from '@icons-pack/react-simple-icons';
-import {
-  SiAlibaba,
-  SiBaidu,
-  SiDingtalk,
-  SiGithub,
-  SiMicroblog,
-  SiZhihu,
-} from '@icons-pack/react-simple-icons';
-
 export interface McpscopeAppType {
   appSlug: string;
   author: string;
   authorUrl?: string;
   description: string;
-  icon: string | IconType;
+  icon: string;
   identifier: string;
   label: string;
   readme: string;
@@ -40,7 +30,7 @@ export const MCOPSCOPE_APP_TYPES: McpscopeAppType[] = [
     author: 'ModelScope',
     authorUrl: 'https://modelscope.cn',
     description: '钉钉是阿里巴巴旗下的企业协作平台',
-    icon: SiDingtalk,
+    icon: 'https://hub-apac-1.lobeobjects.space/assets/logos/dingtalk.svg',
     identifier: 'dingtalk',
     label: '钉钉',
     readme: '集成钉钉，通过自然语言发送消息、管理审批流程、安排日程，提升企业办公效率。',
@@ -88,7 +78,7 @@ export const MCOPSCOPE_APP_TYPES: McpscopeAppType[] = [
     author: 'ModelScope',
     authorUrl: 'https://modelscope.cn',
     description: '支付宝是阿里巴巴旗下的第三方支付平台',
-    icon: SiAlibaba,
+    icon: 'https://hub-apac-1.lobeobjects.space/assets/logos/alipay.svg',
     identifier: 'alipay',
     label: '支付宝',
     readme: '集成支付宝，通过自然语言查询账单、转账、管理订单，实现便捷的支付管理。',
@@ -112,7 +102,7 @@ export const MCOPSCOPE_APP_TYPES: McpscopeAppType[] = [
     author: 'ModelScope',
     authorUrl: 'https://modelscope.cn',
     description: '百度搜索是全球最大的中文搜索引擎',
-    icon: SiBaidu,
+    icon: 'https://hub-apac-1.lobeobjects.space/assets/logos/baidu.svg',
     identifier: 'baidu-search',
     label: '百度搜索',
     readme: '集成百度搜索，通过自然语言进行网页搜索、新闻搜索、知识查询，获取丰富的信息资源。',
@@ -124,7 +114,7 @@ export const MCOPSCOPE_APP_TYPES: McpscopeAppType[] = [
     author: 'ModelScope',
     authorUrl: 'https://modelscope.cn',
     description: '微博是中国领先的社交媒体平台',
-    icon: SiMicroblog,
+    icon: 'https://hub-apac-1.lobeobjects.space/assets/logos/weibo.svg',
     identifier: 'weibo',
     label: '微博',
     readme: '集成微博，通过自然语言发布微博、管理评论、查询热点、互动粉丝，提升社交影响力。',
@@ -136,7 +126,7 @@ export const MCOPSCOPE_APP_TYPES: McpscopeAppType[] = [
     author: 'ModelScope',
     authorUrl: 'https://modelscope.cn',
     description: '知乎是中国领先的问答社区',
-    icon: SiZhihu,
+    icon: 'https://hub-apac-1.lobeobjects.space/assets/logos/zhihu.svg',
     identifier: 'zhihu',
     label: '知乎',
     readme: '集成知乎，通过自然语言提问、回答问题、发布文章、管理专栏，分享知识和见解。',
@@ -148,7 +138,7 @@ export const MCOPSCOPE_APP_TYPES: McpscopeAppType[] = [
     author: 'ModelScope',
     authorUrl: 'https://modelscope.cn',
     description: 'MiniMax 是一家专注于AI技术的创新公司',
-    icon: SiGithub,
+    icon: 'https://hub-apac-1.lobeobjects.space/assets/logos/minimax.svg',
     identifier: 'minimax',
     label: 'MiniMax',
     readme: '集成 MiniMax AI 模型，通过自然语言调用强大的 AI 能力，实现多模态对话和创作。',
