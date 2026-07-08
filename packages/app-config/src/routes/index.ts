@@ -47,6 +47,16 @@ export const NAVIGATION_ROUTES: NavigationRoute[] = [
     pathPrefix: '/community',
   },
   {
+    cmdkKey: 'cmdk.community',
+    electronKey: 'navigation.discover',
+    icon: ShapesIcon,
+    id: 'discover',
+    keywords: ['discover', 'market', 'assistant', 'agent', 'expert'],
+    keywordsKey: 'cmdk.keywords.community',
+    path: '/discover/agent',
+    pathPrefix: '/discover',
+  },
+  {
     cmdkKey: 'cmdk.video',
     electronKey: 'navigation.video',
     icon: Video,
@@ -137,7 +147,7 @@ export const getRouteById = (id: string): NavigationRoute | undefined =>
  */
 export const getNavigableRoutes = (): NavigationRoute[] =>
   NAVIGATION_ROUTES.filter((r) =>
-    ['community', 'image', 'resource', 'page', 'memory'].includes(r.id),
+    ['community', 'discover', 'image', 'resource', 'page', 'memory'].includes(r.id),
   ).map((r) =>
     r.id === 'image'
       ? {

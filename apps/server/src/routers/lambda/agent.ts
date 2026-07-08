@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { withScopedPermission } from '@/business/server/trpc-middlewares/rbacPermission';
 import { wsCompatProcedure } from '@/business/server/trpc-middlewares/workspaceAuth';
 import { AgentModel } from '@/database/models/agent';
+import { AgentShareModel } from '@/database/models/agentShare';
 import { ChatGroupModel } from '@/database/models/chatGroup';
 import { FileModel } from '@/database/models/file';
 import { KnowledgeBaseModel } from '@/database/models/knowledgeBase';
@@ -38,6 +39,25 @@ const agentProcedure = wsCompatProcedure.use(serverDatabase).use(async (opts) =>
 });
 
 export const agentRouter = router({
+  /**
+   * Paginated list of official agents for the marketplace.
+   * Visible to all signed-in users — no ownership filter.
+   */
+  getOfficialAgents: agentProcedure
+    .input(
+      z
+        .object({
+          keyword: z.string().optional(),
+          page: z.number().optional(),
+          pageSize: z.number().optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ input, ctx }) => {
+      const shareModel = new AgentShareModel(ctx.serverDB, ctx.userId, ctx.workspaceId);
+      return shareModel.getOfficialAgents(input);
+    }),
+
   /**
    * Check if an agent with the given marketIdentifier already exists
    */
@@ -476,7 +496,7 @@ export const agentRouter = router({
     }),
 
   updateAgentConfig: agentProcedure
-    .use(withScopedPermission('agent:update'))
+    .use(withScopedPermission('agent:profile_update'))
     .input(
       z.object({
         agentId: z.string(),
@@ -517,7 +537,7 @@ export const agentRouter = router({
     }),
 
   acquireAgentLock: agentProcedure
-    .use(withScopedPermission('agent:update'))
+    .use(withScopedPermission('agent:profile_update'))
     .input(z.object({ agentId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.workspaceId) return { expiresAt: null, holderId: null, lockedByOther: false };
@@ -558,5 +578,102 @@ export const agentRouter = router({
         { id: input.agentId, type: 'agent' },
         { actorId: ctx.userId, data: { holderId: null }, type: 'lock.changed' },
       );
+    }),
+
+  publishAsOfficialAgent: agentProcedure
+    .use(withScopedPermission('agent:publish'))
+    .input(z.object({ agentId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const shareModel = new AgentShareModel(ctx.serverDB, ctx.userId, ctx.workspaceId);
+      return shareModel.publishAsOfficial(input.agentId, {
+        skipOwnershipCheck: ctx.hasAllPermissions,
+      });
+    }),
+
+  unpublishOfficialAgent: agentProcedure
+    .use(withScopedPermission('agent:publish'))
+    .input(z.object({ agentId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const shareModel = new AgentShareModel(ctx.serverDB, ctx.userId, ctx.workspaceId);
+      return shareModel.unpublishOfficial(input.agentId);
+    }),
+
+  isOfficialAgent: agentProcedure
+    .input(z.object({ agentId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const shareModel = new AgentShareModel(ctx.serverDB, ctx.userId, ctx.workspaceId);
+      const isOfficial = await shareModel.isOfficial(input.agentId);
+      return { isOfficial };
+    }),
+
+  approveAgentReview: agentProcedure
+    .use(withScopedPermission('agent:publish'))
+    .input(z.object({ agentId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const shareModel = new AgentShareModel(ctx.serverDB, ctx.userId, ctx.workspaceId);
+      return shareModel.approveReview(input.agentId);
+    }),
+
+  rejectAgentReview: agentProcedure
+    .use(withScopedPermission('agent:publish'))
+    .input(z.object({ agentId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const shareModel = new AgentShareModel(ctx.serverDB, ctx.userId, ctx.workspaceId);
+      return shareModel.rejectReview(input.agentId);
+    }),
+
+  getPendingAgentReviews: agentProcedure
+    .use(withScopedPermission('agent:publish'))
+    .input(z.object({ page: z.number().optional(), pageSize: z.number().optional() }))
+    .query(async ({ input, ctx }) => {
+      const shareModel = new AgentShareModel(ctx.serverDB, ctx.userId, ctx.workspaceId);
+      return shareModel.getPendingReviews(input);
+    }),
+
+  isAgentPendingReview: agentProcedure
+    .input(z.object({ agentId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const shareModel = new AgentShareModel(ctx.serverDB, ctx.userId, ctx.workspaceId);
+      const isPendingReview = await shareModel.isPendingReview(input.agentId);
+      return { isPendingReview };
+    }),
+
+  /**
+   * Install an official agent into the user's session.
+   * Creates a new agent + session for the user, with forkedFromIdentifier
+   * set so subsequent installs are idempotent.
+   */
+  installOfficialAgent: agentProcedure
+    .input(z.object({ agentId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      // 1. Check if already installed
+      const existingAgentId = await ctx.agentModel.getAgentByForkedFromIdentifier(input.agentId);
+      if (existingAgentId) {
+        return { agentId: existingAgentId, alreadyInstalled: true };
+      }
+
+      // 2. Get the official agent config
+      const shareModel = new AgentShareModel(ctx.serverDB, ctx.userId, ctx.workspaceId);
+      const officialAgent = await shareModel.getOfficialAgent(input.agentId);
+      if (!officialAgent) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Official agent not found',
+        });
+      }
+
+      // 3. Create session with forkedFromIdentifier marker in params
+      const currentParams =
+        typeof officialAgent.params === 'object' && officialAgent.params !== null
+          ? officialAgent.params
+          : {};
+      const result = await ctx.sessionModel.create({
+        config: {
+          ...officialAgent,
+          params: { ...currentParams, forkedFromIdentifier: input.agentId },
+        },
+      });
+
+      return { agentId: result.agentId, alreadyInstalled: false };
     }),
 });

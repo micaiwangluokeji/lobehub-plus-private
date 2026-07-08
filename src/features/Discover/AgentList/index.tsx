@@ -156,7 +156,11 @@ const OfficialAgentCard = memo<OfficialAgentCardProps>(({ agent, mobile }) => {
       style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
       onClick={handleCardClick}
     >
-      <Flexbox className={styles.cardContent} flex={1} style={{ display: 'flex', flexDirection: 'column' }}>
+      <Flexbox
+        className={styles.cardContent}
+        flex={1}
+        style={{ display: 'flex', flexDirection: 'column' }}
+      >
         <Flexbox horizontal align={'flex-start'} gap={12} padding={16} width={'100%'}>
           <div className={styles.avatarWrapper}>
             <Avatar
@@ -192,10 +196,7 @@ const OfficialAgentCard = memo<OfficialAgentCardProps>(({ agent, mobile }) => {
         >
           <Flexbox horizontal align={'center'} gap={8} className={styles.secondaryDesc}>
             {agent.updatedAt && (
-              <PublishedTime
-                date={agent.updatedAt.toISOString()}
-                template={'MMM DD, YYYY'}
-              />
+              <PublishedTime date={agent.updatedAt.toISOString()} template={'MMM DD, YYYY'} />
             )}
           </Flexbox>
           <Button
@@ -205,7 +206,7 @@ const OfficialAgentCard = memo<OfficialAgentCardProps>(({ agent, mobile }) => {
             type={'primary'}
             onClick={handleUse}
           >
-            {t('officialAgent.use')}
+            {t('officialAgent.install')}
           </Button>
         </Flexbox>
       </Flexbox>
@@ -224,7 +225,12 @@ const OfficialAgentList = memo<OfficialAgentListProps>(({ data = [], mobile }) =
 
   if (data.length === 0) {
     return (
-      <Flexbox align={'center'} justify={'center'} style={{ padding: '120px 0', textAlign: 'center' }} width={'100%'}>
+      <Flexbox
+        align={'center'}
+        justify={'center'}
+        style={{ padding: '120px 0', textAlign: 'center' }}
+        width={'100%'}
+      >
         <Text type={'secondary'} style={{ fontSize: 16 }}>
           {t('officialAgent.empty') || '暂无智能体'}
         </Text>

@@ -158,7 +158,7 @@ describe('systemStatusSelectors', () => {
         'pages',
         'tasks',
         'image',
-        'community',
+        'discover',
         'resource',
         'memory',
       ];
@@ -170,10 +170,11 @@ describe('systemStatusSelectors', () => {
         'agent',
         'recents',
         SIDEBAR_SPACER_ID,
+        'community',
         'pages',
+        'discover',
         'tasks',
         'image',
-        'community',
         'resource',
         'memory',
       ]);
@@ -182,13 +183,14 @@ describe('systemStatusSelectors', () => {
     it('should preserve a canonically-positioned spacer', () => {
       const stored = [
         'pages',
+        'discover',
         'recents',
         'private',
         'agent',
         SIDEBAR_SPACER_ID,
+        'community',
         'image',
         'tasks',
-        'community',
         'resource',
         'memory',
       ];
@@ -209,7 +211,7 @@ describe('systemStatusSelectors', () => {
         'private',
         'agent',
         'image',
-        'community',
+        'discover',
         'resource',
         'memory',
       ];
@@ -217,14 +219,15 @@ describe('systemStatusSelectors', () => {
         status: { sidebarItems: stored },
       });
       expect(systemStatusSelectors.sidebarItems(null)(s)).toEqual([
+        'discover',
         'tasks',
         'pages',
         'recents',
         'private',
         'agent',
         SIDEBAR_SPACER_ID,
-        'image',
         'community',
+        'image',
         'resource',
         'memory',
       ]);
@@ -239,7 +242,7 @@ describe('systemStatusSelectors', () => {
       // every known key is present
       expect(items).toContain('pages');
       expect(items).toContain('tasks');
-      expect(items).toContain('community');
+      expect(items).toContain('discover');
       expect(items).toContain('resource');
       expect(items).toContain('memory');
       // accordion block is flush against the spacer, in stored order
@@ -248,6 +251,8 @@ describe('systemStatusSelectors', () => {
       // missing top-group defaults slot in just before the accordion
       expect(items.indexOf('tasks')).toBeLessThan(spacerIdx - 2);
       expect(items.indexOf('pages')).toBeLessThan(spacerIdx - 2);
+      // discover sits before the accordion
+      expect(items.indexOf('discover')).toBeLessThan(spacerIdx);
       // missing bottom-group defaults sit after the spacer
       expect(items.indexOf('image')).toBeGreaterThan(spacerIdx);
     });
@@ -260,14 +265,15 @@ describe('systemStatusSelectors', () => {
       // accordion slot uses the user's legacy order; `private` (added after
       // the legacy state was saved) is backfilled at the head of the block.
       expect(items).toEqual([
+        'discover',
         'tasks',
         'pages',
         'private',
         'agent',
         'recents',
         SIDEBAR_SPACER_ID,
-        'image',
         'community',
+        'image',
         'resource',
         'memory',
       ]);
@@ -281,14 +287,15 @@ describe('systemStatusSelectors', () => {
       // `private` (new accordion entry not present in legacy state) is
       // backfilled at the head of the block; recents/agent keep legacy order.
       expect(items).toEqual([
+        'discover',
         'tasks',
         'pages',
         'private',
         'recents',
         'agent',
         SIDEBAR_SPACER_ID,
-        'image',
         'community',
+        'image',
         'resource',
         'memory',
       ]);

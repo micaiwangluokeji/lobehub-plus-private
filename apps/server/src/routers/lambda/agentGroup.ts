@@ -6,6 +6,8 @@ import { withScopedPermission } from '@/business/server/trpc-middlewares/rbacPer
 import { wsCompatProcedure } from '@/business/server/trpc-middlewares/workspaceAuth';
 import { AgentModel } from '@/database/models/agent';
 import { ChatGroupModel } from '@/database/models/chatGroup';
+import { ChatGroupShareModel } from '@/database/models/chatGroupShare';
+import { SessionModel } from '@/database/models/session';
 import { UserModel } from '@/database/models/user';
 import { AgentGroupRepository } from '@/database/repositories/agentGroup';
 import { type ChatGroupConfig } from '@/database/types/chatGroup';
@@ -65,6 +67,11 @@ const agentGroupProcedure = wsCompatProcedure.use(serverDatabase).use(async (opt
 // Write variant gates viewers out of chat-group mutations (create/update/
 // delete + member adds/removes). Reads keep the bare proc.
 const agentGroupProcedureWrite = agentGroupProcedure.use(withScopedPermission('agent:update'));
+
+// Profile update variant for group profile editing
+const agentGroupProcedureProfileUpdate = agentGroupProcedure.use(
+  withScopedPermission('group:profile_update'),
+);
 
 export const agentGroupRouter = router({
   addAgentsToGroup: agentGroupProcedureWrite
@@ -400,7 +407,7 @@ export const agentGroupRouter = router({
       return ctx.chatGroupModel.publishToWorkspace(input.id);
     }),
 
-  updateGroup: agentGroupProcedureWrite
+  updateGroup: agentGroupProcedureProfileUpdate
     .input(
       z.object({
         id: z.string(),
@@ -429,7 +436,7 @@ export const agentGroupRouter = router({
       });
     }),
 
-  acquireGroupLock: agentGroupProcedureWrite
+  acquireGroupLock: agentGroupProcedureProfileUpdate
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.workspaceId) return { expiresAt: null, holderId: null, lockedByOther: false };
@@ -444,7 +451,7 @@ export const agentGroupRouter = router({
       return result;
     }),
 
-  getGroupLock: agentGroupProcedureWrite
+  getGroupLock: agentGroupProcedureProfileUpdate
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       if (!ctx.workspaceId) return { expiresAt: null, holderId: null, lockedByOther: false };
@@ -468,6 +475,137 @@ export const agentGroupRouter = router({
         { id: input.id, type: 'chatGroup' },
         { actorId: ctx.userId, data: { holderId: null }, type: 'lock.changed' },
       );
+    }),
+
+  publishAsOfficialGroup: agentGroupProcedureWrite
+    .use(withScopedPermission('group:publish'))
+    .input(z.object({ groupId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const shareModel = new ChatGroupShareModel(ctx.serverDB, ctx.userId, ctx.workspaceId);
+      return shareModel.publishAsOfficial(input.groupId, {
+        skipOwnershipCheck: ctx.hasAllPermissions,
+      });
+    }),
+
+  unpublishOfficialGroup: agentGroupProcedureWrite
+    .use(withScopedPermission('group:publish'))
+    .input(z.object({ groupId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const shareModel = new ChatGroupShareModel(ctx.serverDB, ctx.userId, ctx.workspaceId);
+      return shareModel.unpublishOfficial(input.groupId);
+    }),
+
+  isOfficialGroup: agentGroupProcedure
+    .input(z.object({ groupId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const shareModel = new ChatGroupShareModel(ctx.serverDB, ctx.userId, ctx.workspaceId);
+      const isOfficial = await shareModel.isOfficial(input.groupId);
+      return { isOfficial };
+    }),
+
+  /**
+   * Paginated list of official groups for the marketplace.
+   * Visible to all signed-in users — no ownership filter.
+   */
+  getOfficialGroups: agentGroupProcedure
+    .input(
+      z
+        .object({
+          keyword: z.string().optional(),
+          page: z.number().optional(),
+          pageSize: z.number().optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ input, ctx }) => {
+      const shareModel = new ChatGroupShareModel(ctx.serverDB, ctx.userId, ctx.workspaceId);
+      return shareModel.getOfficialGroups(input);
+    }),
+
+  approveGroupReview: agentGroupProcedureWrite
+    .use(withScopedPermission('group:publish'))
+    .input(z.object({ groupId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const shareModel = new ChatGroupShareModel(ctx.serverDB, ctx.userId, ctx.workspaceId);
+      return shareModel.approveReview(input.groupId);
+    }),
+
+  rejectGroupReview: agentGroupProcedureWrite
+    .use(withScopedPermission('group:publish'))
+    .input(z.object({ groupId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const shareModel = new ChatGroupShareModel(ctx.serverDB, ctx.userId, ctx.workspaceId);
+      return shareModel.rejectReview(input.groupId);
+    }),
+
+  getPendingGroupReviews: agentGroupProcedureWrite
+    .use(withScopedPermission('group:publish'))
+    .input(z.object({ page: z.number().optional(), pageSize: z.number().optional() }))
+    .query(async ({ input, ctx }) => {
+      const shareModel = new ChatGroupShareModel(ctx.serverDB, ctx.userId, ctx.workspaceId);
+      return shareModel.getPendingReviews(input);
+    }),
+
+  isGroupPendingReview: agentGroupProcedure
+    .input(z.object({ groupId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const shareModel = new ChatGroupShareModel(ctx.serverDB, ctx.userId, ctx.workspaceId);
+      const isPendingReview = await shareModel.isPendingReview(input.groupId);
+      return { isPendingReview };
+    }),
+
+  /**
+   * Install an official group into the user's sessions.
+   * Creates a new group + session for the user, with forkedFromIdentifier
+   * set so subsequent installs are idempotent.
+   */
+  installOfficialGroup: agentGroupProcedure
+    .input(z.object({ groupId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      // 1. Check if already installed
+      const existingGroupId = await ctx.chatGroupModel.getGroupByForkedFromIdentifier(
+        input.groupId,
+      );
+      if (existingGroupId) {
+        return { groupId: existingGroupId, alreadyInstalled: true };
+      }
+
+      // 2. Get the official group detail
+      const shareModel = new ChatGroupShareModel(ctx.serverDB, ctx.userId, ctx.workspaceId);
+      const officialGroup = await shareModel.getOfficialGroup(input.groupId);
+      if (!officialGroup) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Official group not found',
+        });
+      }
+
+      // 3. Create a group record with forkedFromIdentifier marker
+      const currentConfig =
+        typeof officialGroup.config === 'object' && officialGroup.config !== null
+          ? (officialGroup.config as Record<string, unknown>)
+          : {};
+      const newGroup = await ctx.chatGroupModel.create({
+        ...officialGroup,
+        config: { ...currentConfig, forkedFromIdentifier: input.groupId },
+      });
+
+      // 4. Create a session for the group
+      const sessionModel = new SessionModel(ctx.serverDB, ctx.userId, ctx.workspaceId ?? undefined);
+      await sessionModel.create({
+        type: 'group',
+        config: {
+          title: officialGroup.title ?? 'Group',
+          description: officialGroup.description,
+          avatar: officialGroup.avatar,
+          backgroundColor: officialGroup.backgroundColor,
+        },
+        session: {
+          groupId: newGroup.id,
+        },
+      });
+
+      return { groupId: newGroup.id, alreadyInstalled: false };
     }),
 });
 

@@ -56,7 +56,8 @@ export const useNavLayout = (): NavLayout => {
 
     return (navId: string) => {
       if (!roleSuffix) return true; // super_admin sees all
-      const flagKey = `showNav${navId.charAt(0).toUpperCase()}${navId.slice(1)}${roleSuffix}` as keyof typeof featureFlags;
+      const flagKey =
+        `showNav${navId.charAt(0).toUpperCase()}${navId.slice(1)}${roleSuffix}` as keyof typeof featureFlags;
       return featureFlags[flagKey] !== false;
     };
   }, [primaryRole, featureFlags]);
@@ -113,7 +114,7 @@ export const useNavLayout = (): NavLayout => {
           url: '/image',
         },
         {
-          hidden: !showMarket || !canManageOfficial || !isNavVisibleForRole('community'),
+          hidden: !showMarket || !isNavVisibleForRole('community'),
           icon: getRouteById('community')!.icon,
           key: SidebarTabKey.Community,
           title: t('tab.community'),

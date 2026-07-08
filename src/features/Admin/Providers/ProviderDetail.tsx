@@ -6,6 +6,8 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router';
 
 import { PageHeader, StatusTag } from '@/features/Admin/common';
+import { ProviderSettingsContext } from '@/routes/(main)/settings/provider/features/ModelList/ProviderSettingsContext';
+import ModelList from '@/routes/(main)/settings/provider/features/ModelList';
 
 import type { AdminProvider, UpdateProviderParams } from '@/services/admin/providers';
 import { adminProviderService } from '@/services/admin/providers';
@@ -71,7 +73,13 @@ const ProviderDetail = memo(() => {
         enabled,
         checkModel: checkModel || undefined,
         fetchOnClient,
-        keyVaults: apiKey || baseURL ? { apiKey: apiKey || undefined, baseURL: baseURL || undefined } as Record<string, string> : undefined,
+        keyVaults:
+          apiKey || baseURL
+            ? ({ apiKey: apiKey || undefined, baseURL: baseURL || undefined } as Record<
+                string,
+                string
+              >)
+            : undefined,
         settings: { sdkType: sdkType || undefined } as Record<string, unknown>,
       };
       await adminProviderService.update(id, params);
@@ -81,7 +89,21 @@ const ProviderDetail = memo(() => {
     } finally {
       setSaving(false);
     }
-  }, [id, name, label, description, sort, enabled, checkModel, fetchOnClient, apiKey, baseURL, sdkType, t, fetchData]);
+  }, [
+    id,
+    name,
+    label,
+    description,
+    sort,
+    enabled,
+    checkModel,
+    fetchOnClient,
+    apiKey,
+    baseURL,
+    sdkType,
+    t,
+    fetchData,
+  ]);
 
   if (loading) {
     return (
@@ -92,7 +114,11 @@ const ProviderDetail = memo(() => {
   }
 
   if (!provider) {
-    return <div style={{ padding: 24, color: 'var(--ant-color-text-quaternary)' }}>Provider not found</div>;
+    return (
+      <div style={{ padding: 24, color: 'var(--ant-color-text-quaternary)' }}>
+        Provider not found
+      </div>
+    );
   }
 
   const inputStyle: React.CSSProperties = {
@@ -126,11 +152,28 @@ const ProviderDetail = memo(() => {
       />
       <div style={{ maxWidth: 640 }}>
         {/* 基本信息 */}
-        <div style={{ background: 'var(--ant-color-bg-container)', borderRadius: 12, border: '1px solid var(--ant-color-border-secondary)', padding: 24, marginBottom: 16 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4, color: 'var(--ant-color-text)' }}>
+        <div
+          style={{
+            background: 'var(--ant-color-bg-container)',
+            borderRadius: 12,
+            border: '1px solid var(--ant-color-border-secondary)',
+            padding: 24,
+            marginBottom: 16,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 15,
+              fontWeight: 600,
+              marginBottom: 4,
+              color: 'var(--ant-color-text)',
+            }}
+          >
             {t('settings.basicInfo')}
           </div>
-          <div style={{ fontSize: 13, color: 'var(--ant-color-text-quaternary)', marginBottom: 20 }}>
+          <div
+            style={{ fontSize: 13, color: 'var(--ant-color-text-quaternary)', marginBottom: 20 }}
+          >
             Provider: {id} | Source: {provider.source || 'builtin'}
           </div>
           <div style={{ marginBottom: 16 }}>
@@ -152,7 +195,12 @@ const ProviderDetail = memo(() => {
           </div>
           <div style={{ marginBottom: 16 }}>
             <div style={labelStyle}>{t('providers.columns.sort')}</div>
-            <InputNumber min={0} value={sort} onChange={(val) => setSort(val ?? 0)} style={{ width: 200 }} />
+            <InputNumber
+              min={0}
+              value={sort}
+              onChange={(val) => setSort(val ?? 0)}
+              style={{ width: 200 }}
+            />
           </div>
           <div style={{ marginBottom: 16 }}>
             <div style={labelStyle}>{t('providers.columns.enabled')}</div>
@@ -161,11 +209,28 @@ const ProviderDetail = memo(() => {
         </div>
 
         {/* 全局 API 配置 */}
-        <div style={{ background: 'var(--ant-color-bg-container)', borderRadius: 12, border: '1px solid var(--ant-color-border-secondary)', padding: 24, marginBottom: 16 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4, color: 'var(--ant-color-text)' }}>
+        <div
+          style={{
+            background: 'var(--ant-color-bg-container)',
+            borderRadius: 12,
+            border: '1px solid var(--ant-color-border-secondary)',
+            padding: 24,
+            marginBottom: 16,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 15,
+              fontWeight: 600,
+              marginBottom: 4,
+              color: 'var(--ant-color-text)',
+            }}
+          >
             全局 API 配置
           </div>
-          <div style={{ fontSize: 13, color: 'var(--ant-color-text-quaternary)', marginBottom: 20 }}>
+          <div
+            style={{ fontSize: 13, color: 'var(--ant-color-text-quaternary)', marginBottom: 20 }}
+          >
             配置全局 API Key 和访问地址（覆盖用户个人配置）
           </div>
           <div style={{ marginBottom: 16 }}>
@@ -189,7 +254,11 @@ const ProviderDetail = memo(() => {
           </div>
           <div style={{ marginBottom: 16 }}>
             <div style={labelStyle}>检查模型</div>
-            <input style={inputStyle} value={checkModel} onChange={(e) => setCheckModel(e.target.value)} />
+            <input
+              style={inputStyle}
+              value={checkModel}
+              onChange={(e) => setCheckModel(e.target.value)}
+            />
           </div>
           <div style={{ marginBottom: 16 }}>
             <div style={labelStyle}>SDK 类型</div>
@@ -210,6 +279,35 @@ const ProviderDetail = memo(() => {
             <Switch checked={fetchOnClient} onChange={(val) => setFetchOnClient(val)} />
           </div>
         </div>
+
+        {/* 模型管理 */}
+        {id && (
+          <div
+            style={{
+              background: 'var(--ant-color-bg-container)',
+              borderRadius: 12,
+              border: '1px solid var(--ant-color-border-secondary)',
+              padding: 16,
+              marginBottom: 16,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 15,
+                fontWeight: 600,
+                marginBottom: 16,
+                color: 'var(--ant-color-text)',
+              }}
+            >
+              模型管理
+            </div>
+            <ProviderSettingsContext
+              value={{ modelEditable: true, showAddNewModel: true, showDeployName: false }}
+            >
+              <ModelList id={id} />
+            </ProviderSettingsContext>
+          </div>
+        )}
       </div>
     </div>
   );

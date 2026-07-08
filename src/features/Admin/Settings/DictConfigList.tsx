@@ -1,31 +1,17 @@
 'use client';
 
-import { Button, Input, InputNumber, message, Modal, Popconfirm, Select, Switch, Table, Tag } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { Button, Input, InputNumber, message, Modal, Popconfirm, Select, Switch, Tag } from 'antd';
 import { Plus } from 'lucide-react';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { PageHeader } from '@/features/Admin/common';
+import { AdminSearch, AdminTable, PageHeader, StatusTag } from '@/features/Admin/common';
 import {
   adminDictConfigService,
   type DictConfigParams,
+  type DictConfigRecord,
   type UpdateDictConfigParams,
 } from '@/services/admin/dictConfig';
-
-interface DictConfigRecord {
-  id: string;
-  key: string;
-  value: unknown;
-  label: string;
-  group: string;
-  type: string;
-  sort: number;
-  description?: string | null;
-  enabled: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
 
 const typeColors: Record<string, string> = {
   string: 'blue',
@@ -34,18 +20,40 @@ const typeColors: Record<string, string> = {
   json: 'purple',
 };
 
+const groupLabels: Record<string, string> = {
+  system_settings: '系统设置',
+  payment_settings: '支付设置',
+  membership_settings: '会员权益',
+  feature_flags: '功能开关',
+  ai_settings: 'AI 模型设置',
+  content_settings: '内容审核',
+  ui_settings: '界面设置',
+  security_settings: '安全设置',
+  notification_settings: '通知设置',
+  storage_settings: '存储设置',
+  integration_settings: '集成设置',
+  rate_limits: '速率限制',
+  other_settings: '其他设置',
+};
+
 const DictConfigList = memo(() => {
   const { t } = useTranslation('admin');
   const [data, setData] = useState<DictConfigRecord[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [keyword, setKeyword] = useState('');
+  const [groupFilter, setGroupFilter] = useState<string | undefined>();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<DictConfigRecord | null>(null);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   // Form state
   const [formKey, setFormKey] = useState('');
   const [formLabel, setFormLabel] = useState('');
-  const [formGroup, setFormGroup] = useState('general');
+  const [formGroup, setFormGroup] = useState('system_settings');
   const [formType, setFormType] = useState<string>('string');
   const [formSort, setFormSort] = useState(0);
   const [formDescription, setFormDescription] = useState('');
@@ -54,21 +62,71 @@ const DictConfigList = memo(() => {
   const [formBooleanValue, setFormBooleanValue] = useState(false);
   const [formNumberValue, setFormNumberValue] = useState<number>(0);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const result = await adminDictConfigService.list();
-      setData(result as DictConfigRecord[]);
-    } catch {
-      message.error(t('dictConfig.fetchFailed'));
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
+  const fetchData = useCallback(
+    async (p: number, ps: number, kw: string, grp?: string) => {
+      setLoading(true);
+      try {
+        const res = await adminDictConfigService.list({
+          group: grp,
+          keyword: kw,
+          page: p,
+          pageSize: ps,
+        });
+        setData(res.data);
+        setTotal(res.total);
+      } catch {
+        message.error(t('dictConfig.fetchFailed'));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [t],
+  );
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchData(page, pageSize, keyword, groupFilter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleSearch = useCallback(
+    (val: string) => {
+      setKeyword(val);
+      setPage(1);
+      fetchData(1, pageSize, val, groupFilter);
+    },
+    [fetchData, groupFilter, pageSize],
+  );
+
+  const handlePageChange = useCallback(
+    (p: number, ps: number) => {
+      setPage(p);
+      setPageSize(ps);
+      fetchData(p, ps, keyword, groupFilter);
+    },
+    [fetchData, groupFilter, keyword],
+  );
+
+  const handleGroupChange = useCallback(
+    (val: string | undefined) => {
+      setGroupFilter(val);
+      setPage(1);
+      fetchData(1, pageSize, keyword, val);
+    },
+    [fetchData, keyword, pageSize],
+  );
+
+  const handleSync = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const result = await adminDictConfigService.syncDefaults();
+      message.success(result.message || '同步完成');
+      fetchData(1, pageSize, keyword, groupFilter);
+    } catch {
+      message.error('同步失败');
+    } finally {
+      setSyncing(false);
+    }
+  }, [fetchData, keyword, groupFilter, pageSize]);
 
   const openCreate = useCallback(() => {
     setEditingRecord(null);
@@ -99,7 +157,9 @@ const DictConfigList = memo(() => {
     } else if (record.type === 'number') {
       setFormNumberValue(Number(record.value));
     } else if (record.type === 'json') {
-      setFormValue(typeof record.value === 'string' ? record.value : JSON.stringify(record.value, null, 2));
+      setFormValue(
+        typeof record.value === 'string' ? record.value : JSON.stringify(record.value, null, 2),
+      );
     } else {
       setFormValue(String(record.value ?? ''));
     }
@@ -155,75 +215,107 @@ const DictConfigList = memo(() => {
         message.success(t('dictConfig.createSuccess'));
       }
       setModalOpen(false);
-      fetchData();
+      fetchData(page, pageSize, keyword, groupFilter);
     } catch {
       message.error(t('dictConfig.saveFailed'));
     } finally {
       setSaving(false);
     }
-  }, [editingRecord, formKey, formLabel, formGroup, formType, formSort, formDescription, formEnabled, buildValue, t, fetchData]);
+  }, [
+    editingRecord,
+    formKey,
+    formLabel,
+    formGroup,
+    formType,
+    formSort,
+    formDescription,
+    formEnabled,
+    buildValue,
+    t,
+    fetchData,
+    page,
+    pageSize,
+    keyword,
+    groupFilter,
+  ]);
 
-  const handleDelete = useCallback(async (id: string) => {
-    try {
-      await adminDictConfigService.delete(id);
-      message.success(t('dictConfig.deleteSuccess'));
-      fetchData();
-    } catch {
-      message.error(t('dictConfig.deleteFailed'));
-    }
-  }, [t, fetchData]);
+  const handleDelete = useCallback(
+    async (id: string) => {
+      try {
+        await adminDictConfigService.delete(id);
+        message.success(t('dictConfig.deleteSuccess'));
+        fetchData(page, pageSize, keyword, groupFilter);
+      } catch {
+        message.error(t('dictConfig.deleteFailed'));
+      }
+    },
+    [t, fetchData, page, pageSize, keyword, groupFilter],
+  );
 
-  const columns: ColumnsType<DictConfigRecord> = [
+  // Extract unique groups from data for filter
+  const groups = [...new Set(data.map((d) => d.group).filter(Boolean))].sort();
+
+  const columns = [
     {
-      title: t('dictConfig.columns.key'),
       dataIndex: 'key',
       key: 'key',
+      render: (text: string) => <code>{text}</code>,
+      title: t('dictConfig.columns.key'),
       width: 180,
     },
     {
-      title: t('dictConfig.columns.label'),
       dataIndex: 'label',
       key: 'label',
+      title: t('dictConfig.columns.label'),
       width: 160,
     },
     {
-      title: t('dictConfig.columns.group'),
       dataIndex: 'group',
       key: 'group',
-      width: 100,
-      render: (v: string) => <Tag>{v}</Tag>,
+      render: (v: string) => <StatusTag status="system" text={groupLabels[v] || v} />,
+      title: t('dictConfig.columns.group'),
+      width: 120,
     },
     {
-      title: t('dictConfig.columns.type'),
       dataIndex: 'type',
       key: 'type',
-      width: 80,
       render: (v: string) => <Tag color={typeColors[v] || 'default'}>{v}</Tag>,
+      title: t('dictConfig.columns.type'),
+      width: 80,
     },
     {
-      title: t('dictConfig.columns.value'),
       dataIndex: 'value',
-      key: 'value',
       ellipsis: true,
+      key: 'value',
       render: (v: unknown) => {
         if (typeof v === 'boolean') return v ? 'true' : 'false';
-        if (typeof v === 'object') return JSON.stringify(v);
+        if (typeof v === 'object' && v !== null) return JSON.stringify(v);
         return String(v ?? '');
       },
+      title: t('dictConfig.columns.value'),
     },
     {
-      title: t('dictConfig.columns.status'),
       dataIndex: 'enabled',
       key: 'enabled',
+      render: (val: boolean) => (
+        <StatusTag
+          status={val ? 'enabled' : 'disabled'}
+          text={val ? t('dictConfig.enabled') : t('dictConfig.disabled')}
+        />
+      ),
+      title: t('dictConfig.columns.status'),
       width: 80,
-      render: (v: boolean) =>
-        v ? <Tag color="green">{t('dictConfig.enabled')}</Tag> : <Tag color="red">{t('dictConfig.disabled')}</Tag>,
     },
     {
-      title: t('dictConfig.columns.actions'),
-      key: 'actions',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      render: (val: string) => new Date(val).toLocaleString(),
+      title: t('dictConfig.columns.createdAt'),
       width: 160,
-      render: (_, record) => (
+    },
+    {
+      key: 'actions',
+      render: (_: unknown, record: DictConfigRecord) => (
         <div style={{ display: 'flex', gap: 8 }}>
           <Button onClick={() => openEdit(record)} size="small" type="link">
             {t('actions.edit')}
@@ -238,6 +330,8 @@ const DictConfigList = memo(() => {
           </Popconfirm>
         </div>
       ),
+      title: t('dictConfig.columns.actions'),
+      width: 140,
     },
   ];
 
@@ -246,7 +340,14 @@ const DictConfigList = memo(() => {
       case 'boolean':
         return (
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--ant-color-text-secondary)' }}>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 500,
+                marginBottom: 6,
+                color: 'var(--ant-color-text-secondary)',
+              }}
+            >
               {t('dictConfig.form.value')}
             </div>
             <Switch checked={formBooleanValue} onChange={setFormBooleanValue} />
@@ -255,7 +356,14 @@ const DictConfigList = memo(() => {
       case 'number':
         return (
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--ant-color-text-secondary)' }}>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 500,
+                marginBottom: 6,
+                color: 'var(--ant-color-text-secondary)',
+              }}
+            >
               {t('dictConfig.form.value')}
             </div>
             <InputNumber
@@ -268,7 +376,14 @@ const DictConfigList = memo(() => {
       case 'json':
         return (
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--ant-color-text-secondary)' }}>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 500,
+                marginBottom: 6,
+                color: 'var(--ant-color-text-secondary)',
+              }}
+            >
               {t('dictConfig.form.value')}
             </div>
             <Input.TextArea
@@ -281,7 +396,14 @@ const DictConfigList = memo(() => {
       default:
         return (
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--ant-color-text-secondary)' }}>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 500,
+                marginBottom: 6,
+                color: 'var(--ant-color-text-secondary)',
+              }}
+            >
               {t('dictConfig.form.value')}
             </div>
             <Input onChange={(e) => setFormValue(e.target.value)} value={formValue} />
@@ -292,29 +414,47 @@ const DictConfigList = memo(() => {
 
   return (
     <div style={{ padding: 24 }}>
-      <PageHeader subtitle={t('dictConfig.subtitle')} title={t('dictConfig.title')}>
-        <Button icon={<Plus size={16} />} onClick={openCreate} type="primary">
-          {t('dictConfig.create')}
-        </Button>
-      </PageHeader>
+      <PageHeader
+        actions={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button loading={syncing} onClick={handleSync}>
+              🔄 同步字典配置
+            </Button>
+            <Button icon={<Plus size={16} />} onClick={openCreate} type="primary">
+              {t('dictConfig.create')}
+            </Button>
+          </div>
+        }
+        subtitle={t('dictConfig.subtitle')}
+        title={t('dictConfig.title')}
+      />
 
-      <div
-        style={{
-          background: 'var(--ant-color-bg-container)',
-          borderRadius: 12,
-          border: '1px solid var(--ant-color-border-secondary)',
-          overflow: 'hidden',
-        }}
-      >
-        <Table
-          columns={columns}
-          dataSource={data}
-          loading={loading}
-          pagination={{ pageSize: 20 }}
-          rowKey="id"
-          size="middle"
-        />
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+        <AdminSearch onSearch={handleSearch} placeholder={t('actions.search')} />
+        <Select
+          allowClear
+          onChange={handleGroupChange}
+          placeholder="按分类筛选"
+          style={{ width: 200 }}
+          value={groupFilter}
+        >
+          {groups.map((g) => (
+            <Select.Option key={g} value={g}>
+              {groupLabels[g] || g}
+            </Select.Option>
+          ))}
+        </Select>
       </div>
+
+      <AdminTable<DictConfigRecord>
+        columns={columns}
+        dataSource={data}
+        loading={loading}
+        onPageChange={handlePageChange}
+        page={page}
+        pageSize={pageSize}
+        total={total}
+      />
 
       <Modal
         destroyOnClose
@@ -325,7 +465,14 @@ const DictConfigList = memo(() => {
         width={560}
       >
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--ant-color-text-secondary)' }}>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 500,
+              marginBottom: 6,
+              color: 'var(--ant-color-text-secondary)',
+            }}
+          >
             {t('dictConfig.form.key')}
           </div>
           <Input
@@ -336,7 +483,14 @@ const DictConfigList = memo(() => {
           />
         </div>
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--ant-color-text-secondary)' }}>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 500,
+              marginBottom: 6,
+              color: 'var(--ant-color-text-secondary)',
+            }}
+          >
             {t('dictConfig.form.label')}
           </div>
           <Input
@@ -347,13 +501,32 @@ const DictConfigList = memo(() => {
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
           <div style={{ flex: 1, marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--ant-color-text-secondary)' }}>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 500,
+                marginBottom: 6,
+                color: 'var(--ant-color-text-secondary)',
+              }}
+            >
               {t('dictConfig.form.group')}
             </div>
-            <Input onChange={(e) => setFormGroup(e.target.value)} value={formGroup} />
+            <Select
+              onChange={setFormGroup}
+              options={Object.entries(groupLabels).map(([value, label]) => ({ label, value }))}
+              style={{ width: '100%' }}
+              value={formGroup}
+            />
           </div>
           <div style={{ flex: 1, marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--ant-color-text-secondary)' }}>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 500,
+                marginBottom: 6,
+                color: 'var(--ant-color-text-secondary)',
+              }}
+            >
               {t('dictConfig.form.type')}
             </div>
             <Select
@@ -371,7 +544,14 @@ const DictConfigList = memo(() => {
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
           <div style={{ flex: 1, marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--ant-color-text-secondary)' }}>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 500,
+                marginBottom: 6,
+                color: 'var(--ant-color-text-secondary)',
+              }}
+            >
               {t('dictConfig.form.sort')}
             </div>
             <InputNumber
@@ -380,7 +560,15 @@ const DictConfigList = memo(() => {
               value={formSort}
             />
           </div>
-          <div style={{ flex: 1, marginBottom: 16, display: 'flex', alignItems: 'flex-end', paddingBottom: 4 }}>
+          <div
+            style={{
+              flex: 1,
+              marginBottom: 16,
+              display: 'flex',
+              alignItems: 'flex-end',
+              paddingBottom: 4,
+            }}
+          >
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
               <Switch checked={formEnabled} onChange={setFormEnabled} />
               <span style={{ fontSize: 13 }}>{t('dictConfig.form.enabled')}</span>
@@ -389,7 +577,14 @@ const DictConfigList = memo(() => {
         </div>
         {renderValueInput()}
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--ant-color-text-secondary)' }}>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 500,
+              marginBottom: 6,
+              color: 'var(--ant-color-text-secondary)',
+            }}
+          >
             {t('dictConfig.form.description')}
           </div>
           <Input.TextArea

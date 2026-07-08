@@ -22,7 +22,11 @@ export default function PlanComparison() {
             <Card
               hoverable
               title={plan.name}
-              extra={<Tag color="blue">¥{plan.price}/{plan.billingCycle === 'yearly' ? '年' : '月'}</Tag>}
+              extra={
+                <Tag color="blue">
+                  ¥{plan.price}/{plan.billingCycle === 'yearly' ? '年' : '月'}
+                </Tag>
+              }
             >
               <div style={{ minHeight: 200 }}>
                 {(plan.features ?? []).map((f: string, i: number) => (
@@ -39,13 +43,15 @@ export default function PlanComparison() {
                 block
                 onClick={async () => {
                   try {
-                    await topUpService.createOrder({
+                    const order = await topUpService.createOrder({
                       planId: plan.id,
                       amount: plan.price,
                       credits: plan.monthlyCredits || 0,
                     });
-                    window.location.href = '/settings/billing?order=created';
-                  } catch { /* noop */ }
+                    window.location.href = `/settings/payment?orderId=${order.id}`;
+                  } catch {
+                    /* noop */
+                  }
                 }}
                 type="primary"
               >

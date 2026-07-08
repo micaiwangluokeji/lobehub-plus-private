@@ -587,6 +587,7 @@ export default {
   'dictConfig.columns.type': '类型',
   'dictConfig.columns.value': '值',
   'dictConfig.columns.status': '状态',
+  'dictConfig.columns.createdAt': '创建时间',
   'dictConfig.columns.actions': '操作',
   'dictConfig.form.key': '配置键',
   'dictConfig.form.keyPlaceholder': '如：site.registration.enabled',
@@ -711,11 +712,13 @@ export default {
   'agreement.title': '用户服务协议',
   'agreement.lastUpdated': '最后更新',
   'agreement.privacyTitle': '隐私政策',
-  'agreement.privacyIntro': '我们重视您的隐私。本隐私政策说明我们如何收集、使用和保护您的个人信息。',
+  'agreement.privacyIntro':
+    '我们重视您的隐私。本隐私政策说明我们如何收集、使用和保护您的个人信息。',
   'agreement.termsTitle': '服务条款',
   'agreement.termsIntro': '欢迎使用我们的服务。使用本服务即表示您同意以下条款和条件。',
   'agreement.dataCollection': '1. 信息收集',
-  'agreement.dataCollectionDesc': '我们在您注册和使用服务时收集必要的信息，包括邮箱地址、用户名和基本账户信息。',
+  'agreement.dataCollectionDesc':
+    '我们在您注册和使用服务时收集必要的信息，包括邮箱地址、用户名和基本账户信息。',
   'agreement.dataUsage': '2. 信息使用',
   'agreement.dataUsageDesc': '收集的信息用于提供、维护和改进我们的服务，以及与您沟通。',
   'agreement.dataProtection': '3. 数据保护',

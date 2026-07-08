@@ -113,7 +113,7 @@ const resolveApiDescription = (
 };
 
 const useMentionOptions = () => {
-  const { allowed: canEdit } = usePermission('edit_own_content');
+  const { allowed: canEdit } = usePermission('edit_group_profile');
   const installedTools = useToolStore(toolSelectors.metaList, isEqual);
   const toggleAgentPlugin = useAgentStore((s) => s.toggleAgentPlugin);
 

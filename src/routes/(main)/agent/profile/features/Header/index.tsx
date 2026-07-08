@@ -7,17 +7,21 @@ import {
   BarChart3,
   BotMessageSquareIcon,
   Download,
+  Eye,
+  EyeOff,
   MoreHorizontal,
   Settings2Icon,
   Trash,
 } from 'lucide-react';
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useAgentTransferMenuItem } from '@/business/client/hooks/useAgentTransferMenuItem';
 import { useBusinessAgentImportMenuItem } from '@/business/client/hooks/useBusinessAgentImportMenuItem';
 import { message } from '@/components/AntdStaticMethods';
 import { DESKTOP_HEADER_ICON_SMALL_SIZE } from '@/const/layoutTokens';
+import { useClientDataSWR } from '@/libs/swr';
+import { officialAgentKeys } from '@/libs/swr/keys';
 import AgentBreadcrumb from '@/features/AgentBreadcrumb';
 import NavHeader from '@/features/NavHeader';
 import ToggleRightPanelButton from '@/features/RightPanel/ToggleRightPanelButton';
@@ -28,6 +32,7 @@ import { agentSelectors } from '@/store/agent/selectors';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
 import { useHomeStore } from '@/store/home';
+import { officialAgentService } from '@/services/officialAgent';
 import { sanitizeFileName } from '@/utils/sanitizeFileName';
 
 import { openAgentSettingsModal } from '../AgentSettings';
@@ -110,6 +115,18 @@ const Header = memo(() => {
   const lockedByOther = useProfileStore(profileSelectors.lockedByOther);
   const lockPending = useProfileStore(profileSelectors.lockPending);
   const { allowed: canEdit } = usePermission('edit_own_content');
+  const { allowed: canPublishAgent } = usePermission('publish_agent');
+
+  const [isOfficial, setIsOfficial] = useState(false);
+  const { data: isOfficialData, mutate: mutateIsOfficial } = useClientDataSWR(
+    activeAgentId ? officialAgentKeys.isOfficial(activeAgentId) : null,
+    () =>
+      activeAgentId ? officialAgentService.isOfficialAgent(activeAgentId) : Promise.resolve(false),
+  );
+
+  useEffect(() => {
+    setIsOfficial(!!isOfficialData);
+  }, [isOfficialData]);
 
   const handleDelete = useCallback(() => {
     if (!canEdit || !activeAgentId) return;
@@ -171,6 +188,46 @@ const Header = memo(() => {
     }
   }, [config.model, config.plugins, config.provider, editor, isHeterogeneous, meta, systemRole, t]);
 
+  const handlePublishToDiscover = useCallback(() => {
+    if (!activeAgentId) return;
+    confirmModal({
+      title: t('marketPublish.confirm.publish.title', { defaultValue: '发布到发现页' }),
+      content: t('marketPublish.confirm.publish.content', {
+        defaultValue: '确定要将此智能体发布到发现页吗？发布后所有用户都可以看到和使用。',
+      }),
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await officialAgentService.publishAsOfficialAgent(activeAgentId);
+          message.success(t('marketPublish.success.publish', { defaultValue: '发布成功' }));
+          mutateIsOfficial();
+        } catch (error) {
+          message.error(t('marketPublish.error.publish', { defaultValue: '发布失败' }));
+        }
+      },
+    });
+  }, [activeAgentId, mutateIsOfficial, t]);
+
+  const handleUnpublishFromDiscover = useCallback(() => {
+    if (!activeAgentId) return;
+    confirmModal({
+      title: t('marketPublish.confirm.unpublish.title', { defaultValue: '取消发布' }),
+      content: t('marketPublish.confirm.unpublish.content', {
+        defaultValue: '确定要取消发布此智能体吗？取消后其他用户将无法在发现页看到。',
+      }),
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await officialAgentService.unpublishOfficialAgent(activeAgentId);
+          message.success(t('marketPublish.success.unpublish', { defaultValue: '取消发布成功' }));
+          mutateIsOfficial();
+        } catch (error) {
+          message.error(t('marketPublish.error.unpublish', { defaultValue: '取消发布失败' }));
+        }
+      },
+    });
+  }, [activeAgentId, mutateIsOfficial, t]);
+
   const importMenuItem = useBusinessAgentImportMenuItem(activeAgentId ?? undefined);
   const transferMenuItems = useAgentTransferMenuItem(activeAgentId ?? undefined, meta);
 
@@ -204,6 +261,24 @@ const Header = memo(() => {
           if (activeAgentId) navigate(`/agent/${activeAgentId}/stats`);
         },
       },
+      ...(canPublishAgent && activeAgentId
+        ? [
+            isOfficial
+              ? {
+                  danger: true,
+                  icon: <Icon icon={EyeOff} />,
+                  key: 'unpublish-from-discover',
+                  label: t('marketPublish.action.unpublish', { defaultValue: '取消发布到发现页' }),
+                  onClick: handleUnpublishFromDiscover,
+                }
+              : {
+                  icon: <Icon icon={Eye} />,
+                  key: 'publish-to-discover',
+                  label: t('marketPublish.action.publish', { defaultValue: '发布到发现页' }),
+                  onClick: handlePublishToDiscover,
+                },
+          ]
+        : []),
       { type: 'divider' as const },
       {
         children: [
@@ -234,8 +309,12 @@ const Header = memo(() => {
   }, [
     activeAgentId,
     canEdit,
+    canPublishAgent,
     handleExportMarkdown,
     handleDelete,
+    handlePublishToDiscover,
+    handleUnpublishFromDiscover,
+    isOfficial,
     navigate,
     t,
     importMenuItem,

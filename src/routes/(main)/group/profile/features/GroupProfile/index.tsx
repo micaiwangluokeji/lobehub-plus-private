@@ -1,10 +1,10 @@
 'use client';
 
-import { ActionIcon, Button, DropdownMenu, Flexbox } from '@lobehub/ui';
-import { type ModalInstance } from '@lobehub/ui/base-ui';
+import { ActionIcon, Button, DropdownMenu, Flexbox, Icon } from '@lobehub/ui';
+import { confirmModal, type ModalInstance } from '@lobehub/ui/base-ui';
 import { Divider } from 'antd';
 import { useTheme } from 'antd-style';
-import { MoreHorizontalIcon, PlayIcon, Settings2Icon } from 'lucide-react';
+import { Eye, EyeOff, MoreHorizontalIcon, PlayIcon, Settings2Icon } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
@@ -13,12 +13,16 @@ import urlJoin from 'url-join';
 import { useAgentGroupTransferMenuItem } from '@/business/client/hooks/useAgentGroupTransferMenuItem';
 import { EditingIndicator, type EditLockClient, useEditLock } from '@/features/EditLock';
 import { EditorCanvas } from '@/features/EditorCanvas';
+import { message } from '@/components/AntdStaticMethods';
 import { usePermission } from '@/hooks/usePermission';
 import { useQueryRoute } from '@/hooks/useQueryRoute';
+import { useClientDataSWR } from '@/libs/swr';
+import { officialGroupKeys } from '@/libs/swr/keys';
 import { lambdaClient } from '@/libs/trpc/client';
 import { useAgentGroupStore } from '@/store/agentGroup';
 import { agentGroupSelectors } from '@/store/agentGroup/selectors';
 import { useGroupProfileStore } from '@/store/groupProfile';
+import { officialGroupService } from '@/services/officialGroup';
 
 import { openGroupAgentSettingsModal } from '../AgentSettings';
 import AutoSaveHint from '../Header/AutoSaveHint';
@@ -39,13 +43,64 @@ const groupLockClient: EditLockClient = {
 const GroupProfile = memo(() => {
   const { t } = useTranslation(['setting', 'chat']);
   const { allowed: canEdit } = usePermission('edit_own_content');
+  const { allowed: canPublishGroup } = usePermission('publish_group');
   const theme = useTheme();
   const { gid } = useParams<{ gid: string }>();
-  const groupId = useAgentGroupStore(agentGroupSelectors.activeGroupId);
+  const groupId = gid;
   const currentGroup = useAgentGroupStore((s) => agentGroupSelectors.getGroupById(gid ?? '')(s));
   const updateGroup = useAgentGroupStore((s) => s.updateGroup);
   const router = useQueryRoute();
   const transferMenuItems = useAgentGroupTransferMenuItem(groupId ?? undefined);
+
+  const [isOfficial, setIsOfficial] = useState(false);
+  const { data: isOfficialData, mutate: mutateIsOfficial } = useClientDataSWR(
+    groupId ? officialGroupKeys.isOfficial(groupId) : null,
+    () => (groupId ? officialGroupService.isOfficialGroup(groupId) : Promise.resolve(false)),
+  );
+
+  useEffect(() => {
+    setIsOfficial(!!isOfficialData);
+  }, [isOfficialData]);
+
+  const handlePublishToDiscover = useCallback(() => {
+    if (!groupId) return;
+    confirmModal({
+      title: t('marketPublish.confirm.publish.title', { defaultValue: '发布到发现页' }),
+      content: t('marketPublish.confirm.publish.content', {
+        defaultValue: '确定要将此群组发布到发现页吗？发布后所有用户都可以看到和使用。',
+      }),
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await officialGroupService.publishAsOfficialGroup(groupId);
+          message.success(t('marketPublish.success.publish', { defaultValue: '发布成功' }));
+          mutateIsOfficial();
+        } catch (error) {
+          message.error(t('marketPublish.error.publish', { defaultValue: '发布失败' }));
+        }
+      },
+    });
+  }, [groupId, mutateIsOfficial, t]);
+
+  const handleUnpublishFromDiscover = useCallback(() => {
+    if (!groupId) return;
+    confirmModal({
+      title: t('marketPublish.confirm.unpublish.title', { defaultValue: '取消发布' }),
+      content: t('marketPublish.confirm.unpublish.content', {
+        defaultValue: '确定要取消发布此群组吗？取消后其他用户将无法在发现页看到。',
+      }),
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await officialGroupService.unpublishOfficialGroup(groupId);
+          message.success(t('marketPublish.success.unpublish', { defaultValue: '取消发布成功' }));
+          mutateIsOfficial();
+        } catch (error) {
+          message.error(t('marketPublish.error.unpublish', { defaultValue: '取消发布失败' }));
+        }
+      },
+    });
+  }, [groupId, mutateIsOfficial, t]);
 
   const settingsModalRef = useRef<ModalInstance | null>(null);
   useEffect(
@@ -158,6 +213,29 @@ const GroupProfile = memo(() => {
           >
             {t('startConversation')}
           </Button>
+          {canPublishGroup &&
+            groupId &&
+            (isOfficial ? (
+              <Button
+                danger
+                icon={<Icon icon={EyeOff} />}
+                size={'small'}
+                type={'text'}
+                onClick={handleUnpublishFromDiscover}
+              >
+                {t('marketPublish.action.unpublish', { defaultValue: '取消发布到发现页' })}
+              </Button>
+            ) : (
+              <Button
+                icon={<Icon icon={Eye} />}
+                size={'small'}
+                style={{ color: theme.colorTextSecondary }}
+                type={'text'}
+                onClick={handlePublishToDiscover}
+              >
+                {t('marketPublish.action.publish', { defaultValue: '发布到发现页' })}
+              </Button>
+            ))}
           {!!transferMenuItems?.length && (
             <DropdownMenu items={transferMenuItems}>
               <ActionIcon

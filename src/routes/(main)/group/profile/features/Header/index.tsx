@@ -50,7 +50,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
 
 const Header = memo(() => {
   const { t } = useTranslation('chat');
-  const { allowed: canEdit, reason } = usePermission('edit_own_content');
+  const { allowed: canEdit, reason } = usePermission('edit_group_profile');
 
   const [showAddModal, setShowAddModal] = useState(false);
 

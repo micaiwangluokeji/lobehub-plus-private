@@ -15,6 +15,7 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   card: css`
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
     border-radius: 12px;
     overflow: hidden;
     position: relative;
@@ -54,12 +55,25 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     background: ${cssVar.colorBgContainer};
     border-radius: 0 0 12px 12px;
   `,
-  memberCount: css`
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    color: ${cssVar.colorTextDescription};
+  header: css`
+    position: relative;
+  `,
+  avatarWrapper: css`
+    position: relative;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, ${cssVar.colorPrimary}20, ${cssVar.colorSuccess}20);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    &:hover::after {
+      opacity: 1;
+    }
   `,
   secondaryDesc: css`
     font-size: 12px;
@@ -138,15 +152,21 @@ const OfficialGroupCard = memo<OfficialGroupCardProps>(({ group, mobile }) => {
       style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
       onClick={handleCardClick}
     >
-      <Flexbox className={styles.cardContent} flex={1} style={{ display: 'flex', flexDirection: 'column' }}>
+      <Flexbox
+        className={styles.cardContent}
+        flex={1}
+        style={{ display: 'flex', flexDirection: 'column' }}
+      >
         <Flexbox horizontal align={'flex-start'} gap={12} padding={16} width={'100%'}>
-          <Avatar
-            avatar={group.avatar}
-            background={group.backgroundColor || 'transparent'}
-            shape={'square'}
-            size={48}
-            style={{ flex: 'none' }}
-          />
+          <div className={styles.avatarWrapper}>
+            <Avatar
+              avatar={group.avatar}
+              background={group.backgroundColor || 'transparent'}
+              shape={'square'}
+              size={48}
+              style={{ flex: 'none' }}
+            />
+          </div>
           <Flexbox flex={1} gap={6} style={{ overflow: 'hidden' }}>
             <Text ellipsis as={'h2'} className={styles.title}>
               {group.title}
@@ -177,10 +197,7 @@ const OfficialGroupCard = memo<OfficialGroupCardProps>(({ group, mobile }) => {
               </span>
             )}
             {group.updatedAt && (
-              <PublishedTime
-                date={group.updatedAt.toISOString()}
-                template={'MMM DD, YYYY'}
-              />
+              <PublishedTime date={group.updatedAt.toISOString()} template={'MMM DD, YYYY'} />
             )}
           </Flexbox>
           <Button
@@ -190,7 +207,7 @@ const OfficialGroupCard = memo<OfficialGroupCardProps>(({ group, mobile }) => {
             type={'primary'}
             onClick={handleUse}
           >
-            {t('officialAgent.use')}
+            {t('officialGroup.install')}
           </Button>
         </Flexbox>
       </Flexbox>
@@ -209,7 +226,12 @@ const AgentGroupList = memo<OfficialGroupListProps>(({ data = [], mobile }) => {
 
   if (data.length === 0) {
     return (
-      <Flexbox align={'center'} justify={'center'} style={{ padding: '120px 0', textAlign: 'center' }} width={'100%'}>
+      <Flexbox
+        align={'center'}
+        justify={'center'}
+        style={{ padding: '120px 0', textAlign: 'center' }}
+        width={'100%'}
+      >
         <Text type={'secondary'} style={{ fontSize: 16 }}>
           {t('groupAgents.empty')}
         </Text>

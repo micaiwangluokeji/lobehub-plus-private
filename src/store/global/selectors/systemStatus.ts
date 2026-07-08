@@ -168,14 +168,15 @@ const sidebarExpandedKeys =
 export const SIDEBAR_SPACER_ID = '__spacer__';
 
 export const DEFAULT_SIDEBAR_ITEMS: string[] = [
+  'discover',
   'tasks',
   'pages',
   'recents',
   'private',
   'agent',
   SIDEBAR_SPACER_ID,
-  'image',
   'community',
+  'image',
   'resource',
   'memory',
 ];
@@ -244,13 +245,28 @@ const withAllKnownKeys = (order: string[]): string[] => {
     }
   }
 
-  return [
-    ...withSpacer.slice(0, accordionStartIdx),
-    ...missingTop,
-    ...withSpacer.slice(accordionStartIdx, spacerIdx + 1),
-    ...missingBottom,
-    ...withSpacer.slice(spacerIdx + 1),
-  ];
+  const result =
+    missingTop.length === 0 && missingBottom.length === 0
+      ? withSpacer
+      : [
+          ...withSpacer.slice(0, accordionStartIdx),
+          ...missingTop,
+          ...withSpacer.slice(accordionStartIdx, spacerIdx + 1),
+          ...missingBottom,
+          ...withSpacer.slice(spacerIdx + 1),
+        ];
+
+  // Ensure discover always comes before tasks in the top group
+  const discoverIdx = result.indexOf('discover');
+  const tasksIdx = result.indexOf('tasks');
+  if (discoverIdx !== -1 && tasksIdx !== -1 && discoverIdx > tasksIdx) {
+    const reordered = [...result];
+    reordered.splice(discoverIdx, 1);
+    reordered.splice(tasksIdx, 0, 'discover');
+    return reordered;
+  }
+
+  return result;
 };
 
 const accordionIndices = (items: string[]): number[] => {

@@ -29,6 +29,10 @@ const ACTION_PERMISSION_MAP: Record<string, string[]> = {
   create_content: ['agent:create:all', 'agent:create:owner'],
   // Editing own resources — requires agent:update (free_user has :owner)
   edit_own_content: ['agent:update:all', 'agent:update:owner'],
+  // Editing agent profile — requires agent:profile_update
+  edit_agent_profile: ['agent:profile_update:all', 'agent:profile_update:owner'],
+  // Editing group profile — requires group:profile_update
+  edit_group_profile: ['group:profile_update:all', 'group:profile_update:owner'],
   // Personal settings — no special permission required
   manage_settings: [],
   // API key management — no special permission required for now

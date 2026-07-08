@@ -12,6 +12,11 @@ export interface UpdateSystemConfigParams {
   defaultLanguage?: string;
   registrationEnabled?: boolean;
   maxFileUploadSize?: number;
+  systemLogo?: string;
+  favicon?: string;
+  themeColor?: string;
+  primaryColor?: string;
+  neutralColor?: string;
 }
 
 import { lambdaClient } from '@/libs/trpc/client';

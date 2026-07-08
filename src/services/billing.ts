@@ -22,8 +22,14 @@ export const referralService = {
 };
 
 export const topUpService = {
-  createOrder: (params: { planId?: string; amount: number; credits: number; description?: string }) =>
-    lambdaClient.topUp.createOrder.mutate(params),
+  createOrder: (params: {
+    planId?: string;
+    amount: number;
+    credits: number;
+    description?: string;
+  }) => lambdaClient.topUp.createOrder.mutate(params),
+  createPayment: (params: { orderId: string; method: 'wechat' | 'alipay' }) =>
+    lambdaClient.topUp.createPayment.mutate(params),
   queryOrder: (orderId: string) => lambdaClient.topUp.queryOrder.query({ orderId }),
   listMyOrders: () => lambdaClient.topUp.listMyOrders.query(),
 };

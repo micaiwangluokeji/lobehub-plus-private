@@ -320,9 +320,6 @@ const Footer = memo(() => {
               key: 'setting',
               label: <WorkspaceLink to="/settings">{t(settingLabelKey)}</WorkspaceLink>,
             },
-            {
-              type: 'divider' as const,
-            },
           ]
         : []),
       ...(enableBusinessFeatures
@@ -333,71 +330,6 @@ const Footer = memo(() => {
               label: (
                 <WorkspaceLink to="/settings/referral">{t('userPanel.inviteFriend')}</WorkspaceLink>
               ),
-            },
-          ]
-        : []),
-      {
-        icon: <Icon icon={Book} />,
-        key: 'docs',
-        label: (
-          <a href={DOCUMENTS_REFER_URL} rel="noopener noreferrer" target="_blank">
-            {t('userPanel.docs')}
-          </a>
-        ),
-      },
-      {
-        icon: <Icon icon={Feather} />,
-        key: 'feedback',
-        label: t('userPanel.feedback'),
-        onClick: handleOpenFeedbackModal,
-      },
-      {
-        icon: <Icon icon={DiscordIcon} />,
-        key: 'discord',
-        label: (
-          <a href={SOCIAL_URL.discord} rel="noopener noreferrer" target="_blank">
-            {t('userPanel.discord')}
-          </a>
-        ),
-      },
-      {
-        type: 'divider',
-      },
-      {
-        icon: <Icon icon={FileClockIcon} />,
-        key: 'changelog',
-        label: t('changelog'),
-        onClick: handleOpenChangelogModal,
-      },
-      ...(footer.layout === 'compact' && !footer.hideGitHub
-        ? [
-            {
-              icon: <Icon icon={GithubIcon} />,
-              key: 'github',
-              label: (
-                <a href={GITHUB} rel="noopener noreferrer" target="_blank">
-                  GitHub
-                </a>
-              ),
-            },
-          ]
-        : []),
-      ...(footer.showEvalEntry && footer.layout === 'compact'
-        ? [
-            {
-              icon: <Icon icon={FlaskConical} />,
-              key: 'eval',
-              label: <WorkspaceLink to="/eval">Evaluation Lab</WorkspaceLink>,
-            },
-          ]
-        : []),
-      ...(shouldShowProductHuntMenuEntry
-        ? [
-            {
-              icon: <Icon icon={Rocket} />,
-              key: 'productHunt',
-              label: 'Product Hunt',
-              onClick: handleOpenProductHuntCard,
             },
           ]
         : []),

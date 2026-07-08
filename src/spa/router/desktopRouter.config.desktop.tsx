@@ -664,6 +664,33 @@ export const desktopRoutes: RouteObject[] = [
             handle: { settingsTab: SettingsTabs.Memory },
             path: 'memory',
           },
+          {
+            children: [
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/settings/payment'),
+                  'Desktop > Settings > Payment',
+                ),
+                index: true,
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/settings/payment/success'),
+                  'Desktop > Settings > Payment > Success',
+                ),
+                path: 'success',
+              },
+              {
+                element: dynamicElement(
+                  () => import('@/routes/(main)/settings/payment/cancel'),
+                  'Desktop > Settings > Payment > Cancel',
+                ),
+                path: 'cancel',
+              },
+            ],
+            element: <SettingsLayout />,
+            path: 'payment',
+          },
           // Other settings tabs
           {
             element: <SettingsTabPage />,

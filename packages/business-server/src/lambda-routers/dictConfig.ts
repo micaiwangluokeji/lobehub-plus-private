@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { router } from '@/libs/trpc/lambda';
 import { DictConfigsModel } from '@/database/models/dictConfigs';
+import { seedDictConfigs } from '@/database/utils/seedDictConfigs';
 import { adminGuardProcedure } from '@/business/server/trpc-middlewares/adminGuard';
 
 const adminProcedure = adminGuardProcedure.use(async (opts) => {
@@ -35,9 +36,28 @@ const updateDictConfigSchema = z.object({
   enabled: z.boolean().optional(),
 });
 
+const listDictConfigSchema = z.object({
+  keyword: z.string().optional(),
+  group: z.string().optional(),
+  page: z.number().int().min(1).default(1),
+  pageSize: z.number().int().min(1).max(100).default(20),
+});
+
 export const dictConfigRouter = router({
-  list: adminProcedure.query(async ({ ctx }) => {
-    return ctx.dictConfigsModel.list();
+  list: adminProcedure.input(listDictConfigSchema).query(async ({ input, ctx }) => {
+    return ctx.dictConfigsModel.list(input);
+  }),
+
+  syncDefaults: adminProcedure.mutation(async ({ ctx }) => {
+    const result = await seedDictConfigs(ctx.serverDB);
+    return {
+      success: true,
+      total: result.total,
+      created: result.created,
+      updated: result.updated,
+      skipped: result.skipped,
+      message: `总计 ${result.total} 条，新增 ${result.created} 条，更新 ${result.updated} 条，跳过 ${result.skipped} 条`,
+    };
   }),
 
   getByKey: adminProcedure.input(z.string()).query(async ({ input, ctx }) => {

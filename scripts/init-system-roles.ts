@@ -27,12 +27,11 @@ const main = async () => {
 
   const { serverDB } = await import('../packages/database/src/server');
   const { users } = await import('../packages/database/src/schemas/user');
-  const { permissions, rolePermissions, roles, userRoles } = await import(
-    '../packages/database/src/schemas/rbac'
-  );
-  const { seedSystemRoles, assignSystemRoleToUser } = await import(
-    '../packages/database/src/utils/seedSystemRoles'
-  );
+  const { permissions, rolePermissions, roles, userRoles } =
+    await import('../packages/database/src/schemas/rbac');
+  const { seedSystemRoles, assignSystemRoleToUser } =
+    await import('../packages/database/src/utils/seedSystemRoles');
+  const { seedDictConfigs } = await import('../packages/database/src/utils/seedDictConfigs');
   const { SYSTEM_DEFAULT_ROLES } = await import('@lobechat/const/rbac');
 
   console.log('🔧 Seeding global system roles and permissions...');
@@ -41,6 +40,11 @@ const main = async () => {
   console.log('   super_admin id =', seeded.superAdminRoleId);
   console.log('   vip_user    id =', seeded.vipUserRoleId);
   console.log('   free_user   id =', seeded.freeUserRoleId);
+
+  // Seed default dictionary configurations
+  console.log('\n🔧 Seeding dictionary configurations...');
+  await seedDictConfigs(serverDB);
+  console.log('✅ Dictionary configurations seeded');
 
   // --- Verify roles (workspace_id IS NULL) ---
   const globalRoles = await serverDB
@@ -70,9 +74,7 @@ const main = async () => {
   }
 
   // --- Total permissions in the table ---
-  const [permTotal] = await serverDB
-    .select({ total: count(permissions.id) })
-    .from(permissions);
+  const [permTotal] = await serverDB.select({ total: count(permissions.id) }).from(permissions);
   console.log(`\n📦 Total permissions in rbac_permissions: ${permTotal.total}`);
 
   // --- Find the target user and grant super_admin ---
@@ -96,10 +98,7 @@ const main = async () => {
   console.log(`✅ Granted super_admin to ${ADMIN_EMAIL}`);
 
   // ★ 同步设置 isRoot 字段（与 LifeOS 的 isRoot 机制保持一致）
-  await serverDB
-    .update(users)
-    .set({ isRoot: true })
-    .where(eq(users.id, user.id));
+  await serverDB.update(users).set({ isRoot: true }).where(eq(users.id, user.id));
   console.log(`✅ Set isRoot=true for ${ADMIN_EMAIL}`);
 
   // --- Verify the user-role link ---

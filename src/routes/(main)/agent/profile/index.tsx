@@ -41,7 +41,7 @@ const ProfileArea = memo(() => {
   // reload state (via `retryAgentConfigFetch`) instead of a permanent skeleton.
   const configError = useAgentStore(agentSelectors.currentAgentConfigError);
   const retryAgentConfigFetch = useAgentStore((s) => s.retryAgentConfigFetch);
-  const { allowed: canEdit } = usePermission('edit_own_content');
+  const { allowed: canEdit } = usePermission('edit_agent_profile');
 
   return (
     <>

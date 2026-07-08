@@ -17,6 +17,8 @@ export const PERMISSION_ACTIONS = {
 
   AGENT_UPDATE: 'agent:update',
 
+  AGENT_PROFILE_UPDATE: 'agent:profile_update',
+
   // ==================== Group Management ====================
   GROUP_CREATE: 'group:create',
 
@@ -25,6 +27,8 @@ export const PERMISSION_ACTIONS = {
   GROUP_READ: 'group:read',
 
   GROUP_UPDATE: 'group:update',
+
+  GROUP_PROFILE_UPDATE: 'group:profile_update',
 
   GROUP_FORK: 'group:fork',
 
@@ -312,7 +316,8 @@ export type SystemDefaultRoleName =
 export const ROLE_DESCRIPTIONS = {
   [SYSTEM_DEFAULT_ROLES.SUPER_ADMIN]: 'Administrator with all system permissions',
   [SYSTEM_DEFAULT_ROLES.PRO_USER]: 'Pro user with full creation and publishing permissions',
-  [SYSTEM_DEFAULT_ROLES.VIP_USER]: 'VIP user with extended permissions (legacy, superseded by pro_user)',
+  [SYSTEM_DEFAULT_ROLES.VIP_USER]:
+    'VIP user with extended permissions (legacy, superseded by pro_user)',
   [SYSTEM_DEFAULT_ROLES.FREE_USER]: 'Free user with basic usage permissions',
 } as const;
 
@@ -381,6 +386,13 @@ export const WORKSPACE_ROLE_PERMISSIONS: Record<WorkspaceSystemRoleName, readonl
     `${action('AGENT_UPDATE')}:all`,
     `${action('AGENT_DELETE')}:all`,
     `${action('AGENT_FORK')}:all`,
+    `${action('AGENT_PROFILE_UPDATE')}:all`,
+    `${action('GROUP_READ')}:all`,
+    `${action('GROUP_CREATE')}:all`,
+    `${action('GROUP_UPDATE')}:all`,
+    `${action('GROUP_DELETE')}:all`,
+    `${action('GROUP_FORK')}:all`,
+    `${action('GROUP_PROFILE_UPDATE')}:all`,
     `${action('SESSION_READ')}:all`,
     `${action('SESSION_CREATE')}:all`,
     `${action('SESSION_UPDATE')}:all`,
@@ -433,6 +445,13 @@ export const WORKSPACE_ROLE_PERMISSIONS: Record<WorkspaceSystemRoleName, readonl
     `${action('AGENT_UPDATE')}:owner`,
     `${action('AGENT_DELETE')}:owner`,
     `${action('AGENT_FORK')}:owner`,
+    `${action('AGENT_PROFILE_UPDATE')}:owner`,
+    `${action('GROUP_READ')}:all`,
+    `${action('GROUP_CREATE')}:owner`,
+    `${action('GROUP_UPDATE')}:owner`,
+    `${action('GROUP_DELETE')}:owner`,
+    `${action('GROUP_FORK')}:owner`,
+    `${action('GROUP_PROFILE_UPDATE')}:owner`,
     `${action('SESSION_READ')}:all`,
     `${action('SESSION_CREATE')}:owner`,
     `${action('SESSION_UPDATE')}:owner`,
@@ -545,6 +564,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<SystemDefaultRoleName, readonly str
     `${action('AGENT_DELETE')}:owner`,
     `${action('AGENT_FORK')}:all`,
     `${action('AGENT_PUBLISH')}:owner`,
+    `${action('AGENT_PROFILE_UPDATE')}:owner`,
     // Group — publish own
     // Group — full CRUD + publish own
     `${action('GROUP_CREATE')}:owner`,
@@ -553,6 +573,7 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<SystemDefaultRoleName, readonly str
     `${action('GROUP_DELETE')}:owner`,
     `${action('GROUP_FORK')}:owner`,
     `${action('GROUP_PUBLISH')}:owner`,
+    `${action('GROUP_PROFILE_UPDATE')}:owner`,
     // Session
     `${action('SESSION_READ')}:all`,
     `${action('SESSION_CREATE')}:owner`,
@@ -588,13 +609,10 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<SystemDefaultRoleName, readonly str
     `${action('KNOWLEDGE_BASE_CREATE')}:owner`,
     `${action('KNOWLEDGE_BASE_UPDATE')}:owner`,
     `${action('KNOWLEDGE_BASE_DELETE')}:owner`,
-    // AI Infrastructure — read + invoke + create own
+    // AI Infrastructure — read + invoke only (create/update/delete reserved for super_admin)
     `${action('AI_MODEL_READ')}:all`,
     `${action('AI_MODEL_INVOKE')}:all`,
-    `${action('AI_MODEL_CREATE')}:owner`,
     `${action('AI_PROVIDER_READ')}:all`,
-    `${action('AI_PROVIDER_CREATE')}:owner`,
-    `${action('AI_PROVIDER_UPDATE')}:owner`,
     // API Key — own only
     `${action('API_KEY_READ')}:owner`,
     `${action('API_KEY_CREATE')}:owner`,
@@ -622,12 +640,14 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<SystemDefaultRoleName, readonly str
     `${action('AGENT_DELETE')}:owner`,
     `${action('AGENT_FORK')}:all`,
     `${action('AGENT_PUBLISH')}:owner`,
+    `${action('AGENT_PROFILE_UPDATE')}:owner`,
     `${action('GROUP_CREATE')}:owner`,
     `${action('GROUP_READ')}:all`,
     `${action('GROUP_UPDATE')}:owner`,
     `${action('GROUP_DELETE')}:owner`,
     `${action('GROUP_FORK')}:owner`,
     `${action('GROUP_PUBLISH')}:owner`,
+    `${action('GROUP_PROFILE_UPDATE')}:owner`,
     `${action('SESSION_READ')}:all`,
     `${action('SESSION_CREATE')}:owner`,
     `${action('SESSION_UPDATE')}:owner`,
@@ -676,6 +696,13 @@ export const SYSTEM_ROLE_PERMISSIONS: Record<SystemDefaultRoleName, readonly str
     `${action('AGENT_READ')}:owner`,
     `${action('AGENT_UPDATE')}:owner`,
     `${action('AGENT_DELETE')}:owner`,
+    `${action('AGENT_PROFILE_UPDATE')}:owner`,
+    // Group — read all, manage own
+    `${action('GROUP_READ')}:all`,
+    `${action('GROUP_UPDATE')}:owner`,
+    `${action('GROUP_DELETE')}:owner`,
+    `${action('GROUP_PUBLISH')}:owner`,
+    `${action('GROUP_PROFILE_UPDATE')}:owner`,
     // Session — basic chat
     `${action('SESSION_READ')}:owner`,
     `${action('SESSION_CREATE')}:owner`,

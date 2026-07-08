@@ -315,17 +315,18 @@ export function defineConfig(config: CustomNextConfig) {
         permanent: true,
         source: '/community/providers',
       },
-      // Legacy redirects from /discover to /community
-      {
-        destination: '/community',
-        permanent: true,
-        source: '/discover',
-      },
-      {
-        destination: '/community/:path*',
-        permanent: true,
-        source: '/discover/:path*',
-      },
+      // Legacy redirects from /discover to /community (disabled — discover is now
+      // a separate route for local official agents / groups)
+      // {
+      //   destination: '/community',
+      //   permanent: true,
+      //   source: '/discover',
+      // },
+      // {
+      //   destination: '/community/:path*',
+      //   permanent: true,
+      //   source: '/discover/:path*',
+      // },
       // {
       //   destination: '/settings/common',
       //   permanent: true,
@@ -362,6 +363,7 @@ export function defineConfig(config: CustomNextConfig) {
       'pdfjs-dist',
       'ajv',
       'oidc-provider',
+      'formidable',
     ],
 
     transpilePackages: ['mermaid'],

@@ -1,0 +1,16 @@
+- [x] RBAC 权限中间件已从 no-op stub 恢复为完整实现
+- [x] `withRbacPermission` 函数包含真实权限检查逻辑
+- [x] `withAnyRbacPermission` 函数包含真实权限检查逻辑
+- [x] `withAllRbacPermissions` 函数包含真实权限检查逻辑
+- [x] `withScopedPermission` 函数包含真实权限检查逻辑
+- [x] isRoot 短路逻辑已恢复
+- [x] workspace 作用域权限检查已恢复
+- [x] 核心计费文件内容未变（`src/features/Billing/*`, `src/services/billing.ts`）
+- [x] 管理后台文件内容未变（`src/features/Admin/*`）
+- [x] 数据库 schema 内容未变（`packages/database/src/schemas/membershipLevels.ts`, `rbac.ts` 等）
+- [x] 后端路由内容未变（`packages/business-server/src/lambda-routers/*`）
+- [x] 已修复被覆盖的 `rbacPermission.ts` 和 `workspaceAuditLog.ts`
+- [x] 语法检查通过，RBAC 测试全部通过（61 个测试）
+- [ ] `merge/canary-into-main` 分支已推送到 `private`
+- [ ] `private/main` 已更新为 merge 分支的 HEAD
+- [ ] `private/main` 包含 `private/canary` 的所有提交

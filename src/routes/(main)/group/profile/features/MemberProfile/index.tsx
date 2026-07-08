@@ -25,7 +25,7 @@ import AgentTool from './AgentTool';
 
 const MemberProfile = memo(() => {
   const { t } = useTranslation(['setting', 'chat']);
-  const { allowed: canEdit } = usePermission('edit_own_content');
+  const { allowed: canEdit } = usePermission('edit_group_profile');
 
   // Get agentId from profile store (activeTabId is the selected agent ID)
   const agentId = useGroupProfileStore((s) => s.activeTabId);

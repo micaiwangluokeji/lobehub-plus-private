@@ -2,6 +2,7 @@ export * from './core/db-adaptor';
 export * from './repositories/compression';
 export * from './type';
 export * from './utils/idGenerator';
+export * from './utils/seedDictConfigs';
 export * from './utils/seedSystemRoles';
 export * from './utils/seedWorkspaceRoles';
 export * from './utils/workspace';
