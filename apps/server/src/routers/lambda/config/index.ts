@@ -82,7 +82,9 @@ const NAV_ROLES = ['free_user', 'pro_user', 'vip_user'] as const;
 
 const navVisibilitySchema = z.object(
   Object.fromEntries(
-    NAV_ITEM_IDS.flatMap((navId) => NAV_ROLES.map((role) => [`${navId}_${role}`, z.boolean()])),
+    NAV_ITEM_IDS.flatMap((navId) =>
+      NAV_ROLES.map((role) => [`${navId}_${role}`, z.boolean().optional()]),
+    ),
   ),
 );
 
@@ -135,6 +137,7 @@ export const configRouter = router({
 
     const patch: Record<string, boolean> = {};
     for (const [key, value] of Object.entries(input)) {
+      if (value === undefined) continue;
       // key = 'home_free_user' → flag: 'nav_home_for_free_user'
       const [navId, ...roleParts] = key.split('_');
       const role = roleParts.join('_'); // handles role names with underscores e.g. free_user
