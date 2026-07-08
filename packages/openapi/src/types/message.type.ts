@@ -65,10 +65,7 @@ export const MessagesListQuerySchema = z
     userId: z.string().nullish(),
     role: z.enum(['user', 'system', 'assistant', 'tool']).nullish(),
   })
-  .extend(PaginationQuerySchema.shape)
-  .refine((data) => Boolean(data.topicId || data.userId), {
-    message: 'At least one filter parameter must be provided: topicId or userId',
-  });
+  .extend(PaginationQuerySchema.shape);
 
 // ==================== Message Search Types ====================
 
@@ -158,7 +155,9 @@ export const MessagesCreateRequestSchema = z.object({
 });
 
 export const MessagesCreateWithReplyRequestSchema = MessagesCreateRequestSchema.extend({
-  role: z.literal('user', { errorMap: () => ({ message: 'Role must be user when creating an AI reply' }) }),
+  role: z.literal('user', {
+    errorMap: () => ({ message: 'Role must be user when creating an AI reply' }),
+  }),
 });
 
 export type MessagesCreateWithReplyRequest = z.infer<typeof MessagesCreateWithReplyRequestSchema>;
@@ -190,7 +189,9 @@ export interface MessagesDeleteBatchRequest {
 }
 
 export const MessagesDeleteBatchRequestSchema = z.object({
-  messageIds: z.array(z.string().min(1, 'Message ID cannot be empty')).min(1, 'Message ID array cannot be empty'),
+  messageIds: z
+    .array(z.string().min(1, 'Message ID cannot be empty'))
+    .min(1, 'Message ID array cannot be empty'),
 });
 
 // ==================== Message Response Types ====================
