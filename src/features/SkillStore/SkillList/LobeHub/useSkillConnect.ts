@@ -1,12 +1,21 @@
 'use client';
 
-import { COMPOSIO_APP_TYPES, getLobehubSkillProviderById } from '@lobechat/const';
+import {
+  COMPOSIO_APP_TYPES,
+  MCOPSCOPE_APP_TYPES,
+  getLobehubSkillProviderById,
+} from '@lobechat/const';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useToolStore } from '@/store/tool';
-import { composioStoreSelectors, lobehubSkillStoreSelectors } from '@/store/tool/selectors';
+import {
+  composioStoreSelectors,
+  lobehubSkillStoreSelectors,
+  mcpscopeStoreSelectors,
+} from '@/store/tool/selectors';
 import { ComposioServerStatus } from '@/store/tool/slices/composioStore';
 import { LobehubSkillStatus } from '@/store/tool/slices/lobehubSkillStore/types';
+import { McpscopeServerStatus } from '@/store/tool/slices/mcpscopeStore';
 import { useUserStore } from '@/store/user';
 import { userProfileSelectors } from '@/store/user/selectors';
 
@@ -16,7 +25,7 @@ const POLL_TIMEOUT_MS = 15_000;
 interface UseSkillConnectOptions {
   identifier: string;
   serverName?: string;
-  type: 'composio' | 'lobehub';
+  type: 'composio' | 'lobehub' | 'mcpscope';
 }
 
 export const useSkillConnect = ({ identifier, serverName, type }: UseSkillConnectOptions) => {
@@ -40,6 +49,12 @@ export const useSkillConnect = ({ identifier, serverName, type }: UseSkillConnec
   const refreshComposioConnectionStatus = useToolStore((s) => s.refreshComposioConnectionStatus);
   const removeComposioConnection = useToolStore((s) => s.removeComposioConnection);
   const composioServer = useToolStore(composioStoreSelectors.getServerByIdentifier(identifier));
+
+  // Mcpscope hooks
+  const createMcpscopeConnection = useToolStore((s) => s.createMcpscopeConnection);
+  const refreshMcpscopeConnectionStatus = useToolStore((s) => s.refreshMcpscopeConnectionStatus);
+  const removeMcpscopeConnection = useToolStore((s) => s.removeMcpscopeConnection);
+  const mcpscopeServer = useToolStore(mcpscopeStoreSelectors.getServerByIdentifier(identifier));
 
   const cleanup = useCallback(() => {
     if (windowCheckIntervalRef.current) {
@@ -68,12 +83,21 @@ export const useSkillConnect = ({ identifier, serverName, type }: UseSkillConnec
     const connected =
       type === 'lobehub'
         ? lobehubServer?.status === LobehubSkillStatus.CONNECTED
-        : composioServer?.status === ComposioServerStatus.ACTIVE;
+        : type === 'mcpscope'
+          ? mcpscopeServer?.status === McpscopeServerStatus.ACTIVE
+          : composioServer?.status === ComposioServerStatus.ACTIVE;
 
     if (connected && isWaitingAuth) {
       cleanup();
     }
-  }, [type, lobehubServer?.status, composioServer?.status, isWaitingAuth, cleanup]);
+  }, [
+    type,
+    lobehubServer?.status,
+    composioServer?.status,
+    mcpscopeServer?.status,
+    isWaitingAuth,
+    cleanup,
+  ]);
 
   // Listen for OAuth success message from popup window (for LobeHub skills)
   useEffect(() => {
@@ -103,6 +127,8 @@ export const useSkillConnect = ({ identifier, serverName, type }: UseSkillConnec
         try {
           if (type === 'lobehub') {
             await checkLobehubStatus(serverIdOrName);
+          } else if (type === 'mcpscope') {
+            await refreshMcpscopeConnectionStatus(serverIdOrName);
           } else {
             await refreshComposioConnectionStatus(serverIdOrName);
           }
@@ -119,7 +145,7 @@ export const useSkillConnect = ({ identifier, serverName, type }: UseSkillConnec
         setIsWaitingAuth(false);
       }, POLL_TIMEOUT_MS);
     },
-    [type, checkLobehubStatus, refreshComposioConnectionStatus],
+    [type, checkLobehubStatus, refreshComposioConnectionStatus, refreshMcpscopeConnectionStatus],
   );
 
   const startWindowMonitor = useCallback(
@@ -135,6 +161,8 @@ export const useSkillConnect = ({ identifier, serverName, type }: UseSkillConnec
             // Check status and then reset waiting state
             if (type === 'lobehub') {
               await checkLobehubStatus(serverIdOrName);
+            } else if (type === 'mcpscope') {
+              await refreshMcpscopeConnectionStatus(serverIdOrName);
             } else {
               await refreshComposioConnectionStatus(serverIdOrName);
             }
@@ -149,7 +177,13 @@ export const useSkillConnect = ({ identifier, serverName, type }: UseSkillConnec
         }
       }, 500);
     },
-    [type, checkLobehubStatus, refreshComposioConnectionStatus, startFallbackPolling],
+    [
+      type,
+      checkLobehubStatus,
+      refreshComposioConnectionStatus,
+      refreshMcpscopeConnectionStatus,
+      startFallbackPolling,
+    ],
   );
 
   const openOAuthWindow = useCallback(
@@ -227,7 +261,49 @@ export const useSkillConnect = ({ identifier, serverName, type }: UseSkillConnec
     openOAuthWindow,
   ]);
 
-  const handleConnect = type === 'lobehub' ? handleLobehubConnect : handleComposioConnect;
+  // Handle connect for Mcpscope
+  const handleMcpscopeConnect = useCallback(async () => {
+    if (!userId) return;
+    if (mcpscopeServer) return;
+
+    const appType = MCOPSCOPE_APP_TYPES.find((t) => t.identifier === identifier);
+
+    setIsConnecting(true);
+    try {
+      const newServer = await createMcpscopeConnection({
+        appSlug: appType?.appSlug ?? serverName ?? identifier,
+        identifier,
+        label: appType?.label ?? identifier,
+      });
+
+      if (newServer) {
+        if (newServer.status === McpscopeServerStatus.ACTIVE) {
+          await refreshMcpscopeConnectionStatus(newServer.identifier);
+        } else if (newServer.redirectUrl) {
+          openOAuthWindow(newServer.redirectUrl, newServer.identifier);
+        }
+      }
+    } catch (error) {
+      console.error('[SkillStore] Failed to connect mcpscope server:', error);
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [
+    userId,
+    serverName,
+    mcpscopeServer,
+    identifier,
+    createMcpscopeConnection,
+    refreshMcpscopeConnectionStatus,
+    openOAuthWindow,
+  ]);
+
+  const handleConnect =
+    type === 'lobehub'
+      ? handleLobehubConnect
+      : type === 'mcpscope'
+        ? handleMcpscopeConnect
+        : handleComposioConnect;
 
   const handleDisconnect = useCallback(async () => {
     if (type === 'lobehub' && lobehubServer) {
@@ -239,6 +315,15 @@ export const useSkillConnect = ({ identifier, serverName, type }: UseSkillConnec
         .lobehubSkillServers.find((server) => server.identifier === provider);
 
       return latestServer?.status !== LobehubSkillStatus.CONNECTED;
+    } else if (type === 'mcpscope' && mcpscopeServer) {
+      const serverIdentifier = mcpscopeServer.identifier;
+      await removeMcpscopeConnection(serverIdentifier);
+
+      const latestServer = useToolStore
+        .getState()
+        .mcpscopeServers.find((server) => server.identifier === serverIdentifier);
+
+      return latestServer?.status !== McpscopeServerStatus.ACTIVE;
     } else if (type === 'composio' && composioServer) {
       const serverIdentifier = composioServer.identifier;
       await removeComposioConnection(serverIdentifier);
@@ -251,12 +336,22 @@ export const useSkillConnect = ({ identifier, serverName, type }: UseSkillConnec
     }
 
     return true;
-  }, [type, lobehubServer, composioServer, revokeLobehubConnect, removeComposioConnection]);
+  }, [
+    type,
+    lobehubServer,
+    mcpscopeServer,
+    composioServer,
+    revokeLobehubConnect,
+    removeMcpscopeConnection,
+    removeComposioConnection,
+  ]);
 
   const isConnected =
     type === 'lobehub'
       ? lobehubServer?.status === LobehubSkillStatus.CONNECTED
-      : composioServer?.status === ComposioServerStatus.ACTIVE;
+      : type === 'mcpscope'
+        ? mcpscopeServer?.status === McpscopeServerStatus.ACTIVE
+        : composioServer?.status === ComposioServerStatus.ACTIVE;
 
   return {
     handleConnect,

@@ -50,6 +50,7 @@ import { chunkRouter } from './chunk';
 import { comfyuiRouter } from './comfyui';
 import { composioRouter } from './composio';
 import { configRouter } from './config';
+import { mcpscopeRouter } from './mcpscope';
 import { connectorRouter } from './connector';
 import { deviceRouter } from './device';
 import { documentRouter } from './document';
@@ -129,6 +130,7 @@ export const lambdaRouter = router({
   image: imageRouter,
   importer: importerRouter,
   composio: composioRouter,
+  mcpscope: mcpscopeRouter,
 
   klavis: klavisRouter,
   knowledge: knowledgeRouter,
