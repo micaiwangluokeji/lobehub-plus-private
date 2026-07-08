@@ -126,10 +126,12 @@ const DecorationPage = memo(() => {
 
   const handleSave = useCallback(async () => {
     setSaving(true);
-    try {
-      const values = await form.validateFields();
+    const values = await form.validateFields();
 
-      // Save theme settings via updateSystemConfig
+    let hasError = false;
+
+    // Save theme settings via updateSystemConfig
+    try {
       await adminSettingsService.updateSystemConfig({
         systemName: values.siteName,
         ...(values.logo ? { systemLogo: values.logo } : undefined),
@@ -138,29 +140,38 @@ const DecorationPage = memo(() => {
         ...(values.primaryColor ? { primaryColor: values.primaryColor } : undefined),
         ...(values.neutralColor ? { neutralColor: values.neutralColor } : undefined),
       } as any);
+    } catch (e) {
+      console.error('[Decoration] Theme settings save failed:', e);
+      hasError = true;
+    }
 
-      // Save nav visibility for all roles dynamically
-      const navVisibility: Record<string, boolean> = {};
-      if (values.navVisibility) {
-        for (const navKey of Object.keys(values.navVisibility)) {
-          for (const roleKey of Object.keys(values.navVisibility[navKey])) {
-            const checked = values.navVisibility[navKey][roleKey];
-            if (checked !== undefined) {
-              navVisibility[`${navKey}_${roleKey}`] = checked;
-            }
+    // Save nav visibility for all roles dynamically
+    const navVisibility: Record<string, boolean> = {};
+    if (values.navVisibility) {
+      for (const navKey of Object.keys(values.navVisibility)) {
+        for (const roleKey of Object.keys(values.navVisibility[navKey])) {
+          const checked = values.navVisibility[navKey][roleKey];
+          if (checked !== undefined) {
+            navVisibility[`${navKey}_${roleKey}`] = checked;
           }
         }
       }
-      if (Object.keys(navVisibility).length > 0) {
-        await adminSettingsService.updateNavVisibility(navVisibility);
-      }
-
-      message.success(t('settings.saveSuccess'));
-    } catch {
-      message.error(t('settings.saveFailed'));
-    } finally {
-      setSaving(false);
     }
+    if (Object.keys(navVisibility).length > 0) {
+      try {
+        await adminSettingsService.updateNavVisibility(navVisibility);
+      } catch (e) {
+        console.error('[Decoration] Nav visibility save failed:', e);
+        hasError = true;
+      }
+    }
+
+    if (hasError) {
+      message.error(t('settings.saveFailed'));
+    } else {
+      message.success(t('settings.saveSuccess'));
+    }
+    setSaving(false);
   }, [form, t]);
 
   const tabItems = [
@@ -206,7 +217,14 @@ const DecorationPage = memo(() => {
             {t('decoration.navVisibilityDesc')}
           </div>
           {roles.length === 0 && !rolesLoading && (
-            <div style={{ color: 'var(--ant-color-text-tertiary)', fontSize: 13, padding: 16, textAlign: 'center' }}>
+            <div
+              style={{
+                color: 'var(--ant-color-text-tertiary)',
+                fontSize: 13,
+                padding: 16,
+                textAlign: 'center',
+              }}
+            >
               {t('decoration.noRolesHint')}
             </div>
           )}
@@ -220,7 +238,12 @@ const DecorationPage = memo(() => {
                   {roles.map((role) => (
                     <th
                       key={role.name}
-                      style={{ padding: '8px 12px', width: 120, textAlign: 'center', fontWeight: 600 }}
+                      style={{
+                        padding: '8px 12px',
+                        width: 120,
+                        textAlign: 'center',
+                        fontWeight: 600,
+                      }}
                     >
                       {role.displayName || role.name}
                     </th>
@@ -233,9 +256,7 @@ const DecorationPage = memo(() => {
                     key={nav.key}
                     style={{ borderBottom: '1px solid var(--ant-color-border-secondary)' }}
                   >
-                    <td style={{ padding: '8px 12px' }}>
-                      {navLabelMap[nav.key] ?? nav.i18nKey}
-                    </td>
+                    <td style={{ padding: '8px 12px' }}>{navLabelMap[nav.key] ?? nav.i18nKey}</td>
                     {roles.map((role) => (
                       <td key={role.name} style={{ padding: '8px 12px', textAlign: 'center' }}>
                         <Form.Item
