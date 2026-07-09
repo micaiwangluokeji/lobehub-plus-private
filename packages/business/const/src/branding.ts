@@ -4,10 +4,10 @@
 
 export const LOBE_CHAT_CLOUD = 'LobeHub Cloud';
 
-export const BRANDING_NAME = 'LobeHub';
+export const BRANDING_NAME = '小绿书';
 export const BRANDING_LOGO_URL = '';
 
-export const ORG_NAME = 'LobeHub';
+export const ORG_NAME = '小绿书';
 
 export const BRANDING_URL = {
   help: undefined,
@@ -34,7 +34,7 @@ export const BRANDING_EMAIL = {
   support: 'support@lobehub.com',
 };
 
-export const BRANDING_PROVIDER = 'lobehub';
+export const BRANDING_PROVIDER = '小绿书';
 
 export const COPYRIGHT = `© ${new Date().getFullYear()} ${ORG_NAME}`;
 export const COPYRIGHT_FULL = `${COPYRIGHT}. All rights reserved.`;

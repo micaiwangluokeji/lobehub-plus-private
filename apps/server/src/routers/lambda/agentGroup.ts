@@ -522,6 +522,17 @@ export const agentGroupRouter = router({
       return shareModel.getOfficialGroups(input);
     }),
 
+  /**
+   * Get an official group detail by ID, including its agents.
+   * Visible to all signed-in users — no ownership filter.
+   */
+  getOfficialGroup: agentGroupProcedure
+    .input(z.object({ groupId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const shareModel = new ChatGroupShareModel(ctx.serverDB, ctx.userId, ctx.workspaceId);
+      return shareModel.getOfficialGroupDetail(input.groupId);
+    }),
+
   approveGroupReview: agentGroupProcedureWrite
     .use(withScopedPermission('group:publish'))
     .input(z.object({ groupId: z.string() }))

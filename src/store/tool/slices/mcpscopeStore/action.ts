@@ -87,7 +87,7 @@ export class McpscopeStoreActionImpl {
   createMcpscopeConnection = async (
     params: CreateMcpscopeServerParams,
   ): Promise<McpscopeServer | undefined> => {
-    const { appSlug, identifier, label, mcpUrl } = params;
+    const { appSlug, identifier, label, mcpUrl, envVars } = params;
 
     this.#set(
       produce((draft: McpscopeStoreState) => {
@@ -103,6 +103,7 @@ export class McpscopeStoreActionImpl {
         identifier,
         label,
         mcpUrl,
+        envVars,
       });
 
       const server: McpscopeServer = {

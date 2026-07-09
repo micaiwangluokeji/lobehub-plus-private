@@ -23,6 +23,7 @@ import Empty from '../Empty';
 import { gridStyles } from '../style';
 import WantMoreSkills from '../WantMoreSkills';
 import Item from './Item';
+import { McpscopeConfigModal } from './useSkillConnect';
 
 interface LobeHubListProps {
   keywords: string;
@@ -130,6 +131,7 @@ export const LobeHubList = memo<LobeHubListProps>(({ keywords }) => {
 
   return (
     <>
+      <McpscopeConfigModal />
       <div className={gridStyles.grid}>
         {filteredItems.map((item) => {
           if (item.type === 'builtinAgentSkill') {

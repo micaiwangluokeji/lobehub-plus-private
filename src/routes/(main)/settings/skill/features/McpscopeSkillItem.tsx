@@ -20,7 +20,7 @@ import {
   SquareArrowOutUpRight,
   Unplug,
 } from 'lucide-react';
-import { memo, useState } from 'react';
+import { memo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import NavItem from '@/features/NavPanel/components/NavItem';
@@ -47,6 +47,9 @@ const McpscopeSkillItem = memo<McpscopeSkillItemProps>(
     const { allowed: canCreate, reason: createReason } = usePermission('create_content');
     const { allowed: canEdit, reason: editReason } = usePermission('edit_own_content');
     const [isConnecting, setIsConnecting] = useState(false);
+    // Use refs to avoid stale closure in modal's onClick handler
+    const envVarValuesRef = useRef<Record<string, string>>({});
+    const customMcpUrlRef = useRef('');
 
     const createMcpscopeConnection = useToolStore((s) => s.createMcpscopeConnection);
     const refreshMcpscopeConnectionStatus = useToolStore((s) => s.refreshMcpscopeConnectionStatus);
@@ -57,6 +60,8 @@ const McpscopeSkillItem = memo<McpscopeSkillItemProps>(
       if (server) return;
 
       const envVars = serverType.envVars || [];
+      envVarValuesRef.current = {};
+      customMcpUrlRef.current = '';
 
       showMcpscopeConfigModal({
         content: (
@@ -67,11 +72,17 @@ const McpscopeSkillItem = memo<McpscopeSkillItemProps>(
                 placeholder={`请输入 ${envVar}`}
                 type="password"
                 data-testid={`mcpscope-${serverType.identifier}-${envVar}`}
+                onChange={(e) => {
+                  envVarValuesRef.current[envVar] = e.target.value;
+                }}
               />
             ))}
             <Input
               placeholder="请输入魔搭 MCP SSE URL（可选，留空使用默认）"
               data-testid={`mcpscope-${serverType.identifier}-mcpUrl`}
+              onChange={(e) => {
+                customMcpUrlRef.current = e.target.value;
+              }}
             />
           </Flexbox>
         ),
@@ -79,12 +90,13 @@ const McpscopeSkillItem = memo<McpscopeSkillItemProps>(
           onClick: async () => {
             setIsConnecting(true);
             try {
-              const mcpUrl = serverType.mcpUrl || '';
+              const mcpUrl = customMcpUrlRef.current || serverType.mcpUrl || '';
               const newServer = await createMcpscopeConnection({
                 appSlug: serverType.appSlug,
                 identifier: serverType.identifier,
                 label: serverType.label,
                 mcpUrl,
+                envVars: envVarValuesRef.current,
               });
 
               if (newServer) {

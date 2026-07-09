@@ -59,6 +59,17 @@ export const agentRouter = router({
     }),
 
   /**
+   * Get an official agent by ID.
+   * Visible to all signed-in users — no ownership filter.
+   */
+  getOfficialAgent: agentProcedure
+    .input(z.object({ agentId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      const shareModel = new AgentShareModel(ctx.serverDB, ctx.userId, ctx.workspaceId);
+      return shareModel.getOfficialAgent(input.agentId);
+    }),
+
+  /**
    * Check if an agent with the given marketIdentifier already exists
    */
   checkByMarketIdentifier: agentProcedure

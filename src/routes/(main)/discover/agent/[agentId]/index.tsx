@@ -2,11 +2,11 @@
 
 import { BRANDING_NAME } from '@lobechat/business-const';
 import { AGENT_CHAT_URL } from '@lobechat/const';
-import { Avatar, Block, Button, Collapse, Flexbox, Icon, Tag, Text } from '@lobehub/ui';
+import { Avatar, Block, Button, Center, Collapse, Flexbox, Icon, Tag, Text } from '@lobehub/ui';
 import { ChatList } from '@lobehub/ui/chat';
 import { createStaticStyles, cssVar, useResponsive, useTheme } from 'antd-style';
 import { App } from 'antd';
-import { ArrowLeftIcon } from 'lucide-react';
+import { ArrowLeftIcon, ServerCrash } from 'lucide-react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router';
@@ -63,7 +63,7 @@ const DiscoverAgentDetailPage = memo(() => {
   ]);
   const isSignedIn = useUserStore(authSelectors.isLogin);
 
-  const { data, isLoading } = useOnlyFetchOnceSWR(
+  const { data, isLoading, error, mutate } = useOnlyFetchOnceSWR(
     officialAgentKeys.detail(agentId),
     () => officialAgentService.getOfficialAgent(agentId),
     {
@@ -72,6 +72,23 @@ const DiscoverAgentDetailPage = memo(() => {
   );
 
   if (isLoading) return <Loading />;
+
+  if (error) {
+    return (
+      <Flexbox align={'center'} className={styles.container} padding={80} width={'100%'}>
+        <Center gap={12}>
+          <Icon icon={ServerCrash} size={64} />
+          <Text type={'secondary'}>
+            {t('officialAgent.loadError', { defaultValue: '加载失败，请检查网络后重试' })}
+          </Text>
+          <Button onClick={() => mutate()}>
+            {t('retry', { ns: 'common', defaultValue: '重试' })}
+          </Button>
+        </Center>
+      </Flexbox>
+    );
+  }
+
   if (!data) {
     return (
       <Flexbox align={'center'} className={styles.container} padding={80} width={'100%'}>
@@ -197,9 +214,7 @@ const DiscoverAgentDetailPage = memo(() => {
                   {tag}
                 </Tag>
               ))}
-            {updatedAt && (
-              <PublishedTime className={styles.time} date={updatedAt.toISOString()} />
-            )}
+            {updatedAt && <PublishedTime className={styles.time} date={updatedAt.toISOString()} />}
           </Flexbox>
         )}
       </Flexbox>

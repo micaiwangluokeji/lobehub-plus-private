@@ -5,6 +5,9 @@ import {
   MCOPSCOPE_APP_TYPES,
   getLobehubSkillProviderById,
 } from '@lobechat/const';
+import { Flexbox } from '@lobehub/ui';
+import { confirmModal, createModal } from '@lobehub/ui/base-ui';
+import { Input } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useToolStore } from '@/store/tool';
@@ -22,11 +25,17 @@ import { userProfileSelectors } from '@/store/user/selectors';
 const POLL_INTERVAL_MS = 1000;
 const POLL_TIMEOUT_MS = 15_000;
 
+const { McpscopeConfigModal, showMcpscopeConfigModal, hideMcpscopeConfigModal } = createModal({
+  title: '配置魔搭 MCP 服务',
+});
+
 interface UseSkillConnectOptions {
   identifier: string;
   serverName?: string;
   type: 'composio' | 'lobehub' | 'mcpscope';
 }
+
+export { McpscopeConfigModal };
 
 export const useSkillConnect = ({ identifier, serverName, type }: UseSkillConnectOptions) => {
   const [isConnecting, setIsConnecting] = useState(false);
@@ -267,7 +276,65 @@ export const useSkillConnect = ({ identifier, serverName, type }: UseSkillConnec
     if (mcpscopeServer) return;
 
     const appType = MCOPSCOPE_APP_TYPES.find((t) => t.identifier === identifier);
+    const envVarsList = appType?.envVars || [];
 
+    // If env vars are required, show config modal first
+    if (envVarsList.length > 0) {
+      const envVarsRef: Record<string, string> = {};
+      const mcpUrlRef = { value: '' };
+
+      showMcpscopeConfigModal({
+        content: (
+          <Flexbox vertical gap={16}>
+            {envVarsList.map((envVar) => (
+              <Input
+                key={envVar}
+                placeholder={`请输入 ${envVar}`}
+                type="password"
+                data-testid={`mcpscope-${identifier}-${envVar}`}
+                onChange={(e) => {
+                  envVarsRef[envVar] = e.target.value;
+                }}
+              />
+            ))}
+            <Input
+              placeholder="请输入魔搭 MCP SSE URL（可选，留空使用默认）"
+              data-testid={`mcpscope-${identifier}-mcpUrl`}
+              onChange={(e) => {
+                mcpUrlRef.value = e.target.value;
+              }}
+            />
+          </Flexbox>
+        ),
+        okButtonProps: {
+          onClick: async () => {
+            setIsConnecting(true);
+            try {
+              const mcpUrl = mcpUrlRef.value || appType?.mcpUrl || '';
+              const newServer = await createMcpscopeConnection({
+                appSlug: appType?.appSlug ?? serverName ?? identifier,
+                identifier,
+                label: appType?.label ?? identifier,
+                mcpUrl,
+                envVars: envVarsRef,
+              });
+
+              if (newServer) {
+                await refreshMcpscopeConnectionStatus(newServer.identifier);
+              }
+              hideMcpscopeConfigModal();
+            } catch (error) {
+              console.error('[SkillStore] Failed to connect mcpscope server:', error);
+            } finally {
+              setIsConnecting(false);
+            }
+          },
+        },
+      });
+      return;
+    }
+
+    // No env vars needed, connect directly
     setIsConnecting(true);
     try {
       const newServer = await createMcpscopeConnection({
@@ -277,11 +344,7 @@ export const useSkillConnect = ({ identifier, serverName, type }: UseSkillConnec
       });
 
       if (newServer) {
-        if (newServer.status === McpscopeServerStatus.ACTIVE) {
-          await refreshMcpscopeConnectionStatus(newServer.identifier);
-        } else if (newServer.redirectUrl) {
-          openOAuthWindow(newServer.redirectUrl, newServer.identifier);
-        }
+        await refreshMcpscopeConnectionStatus(newServer.identifier);
       }
     } catch (error) {
       console.error('[SkillStore] Failed to connect mcpscope server:', error);
@@ -295,7 +358,6 @@ export const useSkillConnect = ({ identifier, serverName, type }: UseSkillConnec
     identifier,
     createMcpscopeConnection,
     refreshMcpscopeConnectionStatus,
-    openOAuthWindow,
   ]);
 
   const handleConnect =

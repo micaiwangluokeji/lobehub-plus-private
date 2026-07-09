@@ -22,10 +22,11 @@ export const mcpscopeRouter = router({
         identifier: z.string(),
         label: z.string(),
         mcpUrl: z.string().optional(),
+        envVars: z.record(z.string()).optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const { appSlug, identifier, label, mcpUrl } = input;
+      const { appSlug, identifier, label, mcpUrl, envVars } = input;
 
       const manifest: ToolManifest = {
         api: [],
@@ -42,6 +43,7 @@ export const mcpscopeRouter = router({
         customParams: {
           mcpscope: {
             appSlug,
+            envVars: envVars || {},
             mcpUrl: mcpUrl || '',
             status: 'ACTIVE',
           },

@@ -2,6 +2,7 @@
 
 import { type SkillListItem } from '@lobechat/types';
 import { Center, Icon, Text } from '@lobehub/ui';
+import { Button } from 'antd';
 import isEqual from 'fast-deep-equal';
 import { ServerCrash } from 'lucide-react';
 import { memo, useEffect, useMemo, useRef } from 'react';
@@ -21,8 +22,7 @@ import WantMoreSkills from '../WantMoreSkills';
 import Item from './Item';
 
 type CommunityListItem =
-  | { itemType: 'agentSkill'; skill: SkillListItem }
-  | { data: DiscoverMcpItem; itemType: 'mcp' };
+  { itemType: 'agentSkill'; skill: SkillListItem } | { data: DiscoverMcpItem; itemType: 'mcp' };
 
 export const CommunityList = memo(() => {
   const { t } = useTranslation('setting');
@@ -87,7 +87,7 @@ export const CommunityList = memo(() => {
     }
   }, [keywords, resetMCPPluginList]);
 
-  const { isLoading, error } = useFetchMCPPluginList({
+  const { isLoading, error, mutate } = useFetchMCPPluginList({
     page: currentPage,
     pageSize: 20,
     q: keywords,
@@ -103,7 +103,14 @@ export const CommunityList = memo(() => {
       return (
         <Center gap={12} padding={40}>
           <Icon icon={ServerCrash} size={80} />
-          <Text type={'secondary'}>{t('skillStore.networkError')}</Text>
+          <Text type={'secondary'}>
+            {t('skillStore.networkError', {
+              defaultValue: '无法连接 LobeHub 官方市场，请检查网络后重试',
+            })}
+          </Text>
+          <Button onClick={() => mutate()}>
+            {t('retry', { ns: 'common', defaultValue: '重试' })}
+          </Button>
         </Center>
       );
     }

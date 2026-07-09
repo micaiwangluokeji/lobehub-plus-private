@@ -2,6 +2,7 @@
 
 import { Center, Icon, Text } from '@lobehub/ui';
 import { uniqBy } from 'es-toolkit/compat';
+import { Button } from 'antd';
 import { ServerCrash } from 'lucide-react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -38,7 +39,7 @@ const MarketSkillList = memo<MarketSkillListProps>(({ keywords }) => {
   const [totalPages, setTotalPages] = useState<number>();
 
   const locale = globalHelpers.getCurrentLanguage();
-  const { data, isLoading, error } = useClientDataSWR(
+  const { data, isLoading, error, mutate } = useClientDataSWR(
     discoverKeys.skillStoreMarketSkills(locale, keywords || '', page),
     () =>
       discoverService.getSkillList({
@@ -85,7 +86,14 @@ const MarketSkillList = memo<MarketSkillListProps>(({ keywords }) => {
     return (
       <Center gap={12} padding={40}>
         <Icon icon={ServerCrash} size={80} />
-        <Text type={'secondary'}>{t('skillStore.networkError')}</Text>
+        <Text type={'secondary'}>
+          {t('skillStore.networkError', {
+            defaultValue: '无法连接 LobeHub 官方市场，请检查网络后重试',
+          })}
+        </Text>
+        <Button onClick={() => mutate()}>
+          {t('retry', { ns: 'common', defaultValue: '重试' })}
+        </Button>
       </Center>
     );
   }

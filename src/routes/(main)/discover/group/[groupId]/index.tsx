@@ -1,9 +1,22 @@
 'use client';
 
-import { Avatar, Block, Button, Collapse, Flexbox, Grid, Icon, Tag, Text, Tooltip, TooltipGroup } from '@lobehub/ui';
+import {
+  Avatar,
+  Block,
+  Button,
+  Center,
+  Collapse,
+  Flexbox,
+  Grid,
+  Icon,
+  Tag,
+  Text,
+  Tooltip,
+  TooltipGroup,
+} from '@lobehub/ui';
 import { createStaticStyles, cssVar, useResponsive } from 'antd-style';
 import { App } from 'antd';
-import { ArrowLeftIcon, Crown, UsersIcon } from 'lucide-react';
+import { ArrowLeftIcon, Crown, ServerCrash, UsersIcon } from 'lucide-react';
 import { memo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router';
@@ -131,7 +144,7 @@ const DiscoverGroupDetailPage = memo(() => {
   const { mobile } = useResponsive();
   const [loading, setLoading] = useState(false);
 
-  const { data, isLoading } = useOnlyFetchOnceSWR(
+  const { data, isLoading, error, mutate } = useOnlyFetchOnceSWR(
     officialGroupKeys.detail(groupId),
     () => officialGroupService.getOfficialGroup(groupId),
     {
@@ -140,6 +153,23 @@ const DiscoverGroupDetailPage = memo(() => {
   );
 
   if (isLoading) return <Loading />;
+
+  if (error) {
+    return (
+      <Flexbox align={'center'} className={styles.container} padding={80} width={'100%'}>
+        <Center gap={12}>
+          <Icon icon={ServerCrash} size={64} />
+          <Text type={'secondary'}>
+            {t('officialGroup.loadError', { defaultValue: '加载失败，请检查网络后重试' })}
+          </Text>
+          <Button onClick={() => mutate()}>
+            {t('retry', { ns: 'common', defaultValue: '重试' })}
+          </Button>
+        </Center>
+      </Flexbox>
+    );
+  }
+
   if (!data?.group) return <div style={{ padding: 80, textAlign: 'center' }}>专家团不存在</div>;
 
   const group = data.group;
@@ -163,15 +193,15 @@ const DiscoverGroupDetailPage = memo(() => {
       const result = await officialGroupService.installOfficialGroup(groupId);
 
       if (result.alreadyInstalled) {
-        message.info(t('officialAgent.alreadyInstalled'));
+        message.info(t('officialGroup.alreadyInstalled', { defaultValue: '已安装' }));
       } else {
-        message.success(t('officialAgent.installSuccess'));
+        message.success(t('officialGroup.installSuccess', { defaultValue: '安装成功' }));
       }
 
       navigate(`/group/${result.groupId}`);
     } catch (error) {
       console.error('Install official group failed:', error);
-      message.error(t('officialAgent.installFailed'));
+      message.error(t('officialGroup.installFailed', { defaultValue: '安装失败' }));
     } finally {
       setLoading(false);
     }
@@ -244,7 +274,7 @@ const DiscoverGroupDetailPage = memo(() => {
               onClick={handleUse}
               style={{ alignSelf: 'flex-start', marginTop: 4 }}
             >
-              {t('officialAgent.use')}
+              {t('officialGroup.use', { defaultValue: '使用' })}
             </Button>
           </Flexbox>
         </Flexbox>
