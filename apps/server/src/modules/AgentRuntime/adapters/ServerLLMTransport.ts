@@ -1,8 +1,16 @@
-import type { LLMStreamPayload, LLMStreamResult, LLMTransport } from '@lobechat/agent-runtime';
+import type {
+  LLMCallExecuteInput,
+  LLMStreamPayload,
+  LLMStreamResult,
+  LLMTransport,
+} from '@lobechat/agent-runtime';
 import { consumeStreamUntilDone } from '@lobechat/model-runtime';
 
-import type { LobeChatDatabase } from '@/database/type';
 import { initModelRuntimeFromDB } from '@/server/modules/ModelRuntime';
+
+import type { RuntimeExecutorContext } from '../context';
+import { callLlm as createServerCallLlmExecutor } from './serverCallLlmExecutor';
+import { resolveServerCallLlmTooling } from './serverCallLlmTooling';
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error && error.message) return error.message;
@@ -19,21 +27,28 @@ const getErrorMessage = (error: unknown): string => {
  * returns the aggregated content/usage that package executors need.
  */
 export class ServerLLMTransport implements LLMTransport {
-  constructor(
-    private readonly serverDB: LobeChatDatabase,
-    private readonly userId: string,
-    private readonly workspaceId?: string,
-  ) {}
+  constructor(private readonly ctx: RuntimeExecutorContext) {}
+
+  executeCall(input: LLMCallExecuteInput): ReturnType<NonNullable<LLMTransport['executeCall']>> {
+    return createServerCallLlmExecutor(this.ctx, {
+      assistantMessage: input.assistantMessage,
+      model: input.model,
+      parentId: input.parentId,
+      provider: input.provider,
+      stepLabel: input.stepLabel,
+      tooling: resolveServerCallLlmTooling(this.ctx, input.state),
+    })(input.instruction, input.state);
+  }
 
   async stream(
     payload: LLMStreamPayload,
     handlers?: Parameters<LLMTransport['stream']>[1],
   ): Promise<LLMStreamResult> {
     const runtime = await initModelRuntimeFromDB(
-      this.serverDB,
-      this.userId,
+      this.ctx.serverDB,
+      this.ctx.userId!,
       payload.provider,
-      this.workspaceId,
+      this.ctx.workspaceId,
     );
     const { provider: _provider, ...runtimePayload } = payload;
     let content = '';
@@ -54,7 +69,7 @@ export class ServerLLMTransport implements LLMTransport {
           handlers?.onText?.(text);
         },
       },
-      user: this.userId,
+      user: this.ctx.userId,
     });
 
     await consumeStreamUntilDone(response);

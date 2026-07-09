@@ -19,7 +19,6 @@ import {
   generateCredsList,
   resolveAvailableComposioServices,
 } from '@lobechat/builtin-tool-creds';
-import { LocalSystemManifest } from '@lobechat/builtin-tool-local-system';
 import { builtinTools } from '@lobechat/builtin-tools';
 import { BRANDING_PROVIDER } from '@lobechat/business-const';
 import { COMPOSIO_APP_TYPES } from '@lobechat/const';
@@ -27,17 +26,10 @@ import {
   type AgentBuilderContext,
   type AgentContextDocument,
   type AgentGroupConfig,
-  buildStepSkillDelta,
-  buildStepToolDelta,
-  type LobeToolManifest,
   type OfficialToolItem,
   type OnboardingContext,
-  type OperationToolSet,
-  type ResolvedToolSet,
   resolveTopicReferences,
-  SkillResolver,
   ToolNameResolver,
-  ToolResolver,
 } from '@lobechat/context-engine';
 import {
   applyModelExtendParams,
@@ -96,7 +88,6 @@ import { nanoid } from '@/utils/uuid';
 import { type RuntimeExecutorContext } from '../context';
 import {
   buildPostProcessUrl,
-  buildToolDiscoveryConfig,
   isOperationInterrupted,
   log,
   resolveRuntimeHistoryCount,
@@ -107,7 +98,16 @@ import { formatErrorEventData } from '../formatErrorEventData';
 import { classifyLLMError } from '../llmErrorClassification';
 import { createConversationParentMissingError } from '../messagePersistErrors';
 import { VISIBLE_OUTPUT_END_PUBLISHED_STEP_INDEX_METADATA_KEY } from '../visibleOutputEnd';
-import { resolveRunActiveDeviceId } from './resolveRunActiveDeviceId';
+import { resolveServerCallLlmTooling, type ServerCallLlmTooling } from './serverCallLlmTooling';
+
+interface PreparedCallLLMContext {
+  assistantMessage: { id: string };
+  model: string;
+  parentId?: string;
+  provider: string;
+  stepLabel?: string;
+  tooling?: ServerCallLlmTooling;
+}
 
 const SERVER_LLM_RETRY_POLICY = {
   isEmptyCompletionError: (error: unknown) => error instanceof ModelEmptyError,
@@ -115,7 +115,7 @@ const SERVER_LLM_RETRY_POLICY = {
 };
 
 export const callLlm =
-  (ctx: RuntimeExecutorContext): InstructionExecutor =>
+  (ctx: RuntimeExecutorContext, prepared?: PreparedCallLLMContext): InstructionExecutor =>
   async (instruction, state) => {
     const { payload } = instruction as Extract<AgentInstruction, { type: 'call_llm' }>;
     const llmPayload = payload as CallLLMPayload;
@@ -124,60 +124,11 @@ export const callLlm =
     let visibleOutputEndPublishedStepIndex: number | undefined;
 
     // Fallback to state's modelRuntimeConfig if not in payload
-    const model = llmPayload.model || state.modelRuntimeConfig?.model;
-    const provider = llmPayload.provider || state.modelRuntimeConfig?.provider;
-    // Resolve tools via ToolResolver (unified tool injection).
-    //
-    // Single-track device gate: `buildStepToolDelta` treats activeDeviceId as
-    // an independent activation signal (it only dedupes against already-
-    // enabled tools), so any id that reaches it WILL inject local-system.
-    // `resolveRunActiveDeviceId` swallows the id whenever the plan/policy
-    // forbids devices — the same filter the tool executors apply.
-    const activeDeviceId = resolveRunActiveDeviceId(state.metadata);
-    const operationToolSet: OperationToolSet = state.operationToolSet ?? {
-      enabledToolIds: [],
-      executorMap: state.toolExecutorMap ?? {},
-      manifestMap: state.toolManifestMap ?? {},
-      sourceMap: state.toolSourceMap ?? {},
-      tools: state.tools ?? [],
-    };
-
-    const stepDelta = buildStepToolDelta({
-      activeDeviceId,
-      enabledToolIds: operationToolSet.enabledToolIds,
-      forceFinish: state.forceFinish,
-      localSystemManifest: LocalSystemManifest as unknown as LobeToolManifest,
-      operationManifestMap: operationToolSet.manifestMap,
-    });
-
-    const toolResolver = new ToolResolver();
-    const resolved: ResolvedToolSet = toolResolver.resolve(
-      operationToolSet,
-      stepDelta,
-      state.activatedStepTools ?? [],
-    );
-
-    const tools = resolved.tools.length > 0 ? resolved.tools : undefined;
-    const toolDiscoveryConfig = buildToolDiscoveryConfig(operationToolSet, resolved.enabledToolIds);
-
-    if (stepDelta.activatedTools.length > 0) {
-      log(
-        `[${operationId}:${stepIndex}] ToolResolver injected %d step-level tools: %o`,
-        stepDelta.activatedTools.length,
-        stepDelta.activatedTools.map((t) => t.id),
-      );
-    }
-
-    // Resolve skills via SkillResolver (unified skill injection)
-    const skillResolver = new SkillResolver();
-    const stepSkillDelta = buildStepSkillDelta();
-    const resolvedSkills = state.metadata?.operationSkillSet
-      ? skillResolver.resolve(
-          state.metadata.operationSkillSet,
-          stepSkillDelta,
-          state.activatedStepSkills ?? [],
-        )
-      : undefined;
+    const model = prepared?.model ?? llmPayload.model ?? state.modelRuntimeConfig?.model;
+    const provider =
+      prepared?.provider ?? llmPayload.provider ?? state.modelRuntimeConfig?.provider;
+    const tooling = prepared?.tooling ?? resolveServerCallLlmTooling(ctx, state);
+    const { resolved, resolvedSkills, toolDiscoveryConfig, tools } = tooling;
 
     if (!model || !provider) {
       throw new Error('Model and provider are required for call_llm instruction');
@@ -191,7 +142,8 @@ export const callLlm =
     log(`${stagePrefix} Starting operation`);
 
     // Get parentId from payload (parentId or parentMessageId depending on payload type)
-    const parentId = llmPayload.parentId || (llmPayload as any).parentMessageId;
+    const parentId =
+      prepared?.parentId ?? llmPayload.parentId ?? (llmPayload as any).parentMessageId;
 
     // Parent existence preflight ():
     // If the parent was deleted concurrently (e.g. user deleted topic mid-run),
@@ -199,7 +151,7 @@ export const callLlm =
     // already done the LLM call and spent tokens. Check first — fail fast,
     // save cost, and surface a typed error the frontend can act on instead of
     // a raw SQL error.
-    if (parentId) {
+    if (!prepared && parentId) {
       const parentExists = await ctx.messageModel.findById(parentId);
       if (!parentExists) {
         const error = createConversationParentMissingError(parentId);
@@ -222,7 +174,10 @@ export const callLlm =
     // refetch — chunks would silently no-op against the missing id (LOBE-11501).
     let assistantMessageSeed: Record<string, unknown> | undefined;
 
-    if (existingAssistantMessageId) {
+    if (prepared) {
+      assistantMessageItem = prepared.assistantMessage;
+      log(`${stagePrefix} Using prepared assistant message: %s`, assistantMessageItem.id);
+    } else if (existingAssistantMessageId) {
       // Use existing assistant message (created by execAgent)
       assistantMessageItem = { id: existingAssistantMessageId };
       log(`${stagePrefix} Using existing assistant message: %s`, existingAssistantMessageId);
@@ -246,30 +201,32 @@ export const callLlm =
     }
 
     // Publish stream start event
-    const stepLabel = (instruction as any).stepLabel;
-    await streamManager.publishStreamEvent(operationId, {
-      data: {
-        // Only the seed fields the client needs — not the whole DB row.
-        assistantMessage: {
-          id: assistantMessageItem.id,
-          ...(assistantMessageSeed && {
-            agentId: assistantMessageSeed.agentId,
-            groupId: assistantMessageSeed.groupId,
-            model: assistantMessageSeed.model,
-            parentId: assistantMessageSeed.parentId,
-            provider: assistantMessageSeed.provider,
-            role: assistantMessageSeed.role,
-            threadId: assistantMessageSeed.threadId,
-            topicId: assistantMessageSeed.topicId,
-          }),
+    const stepLabel = prepared?.stepLabel ?? (instruction as any).stepLabel;
+    if (!prepared) {
+      await streamManager.publishStreamEvent(operationId, {
+        data: {
+          // Only the seed fields the client needs — not the whole DB row.
+          assistantMessage: {
+            id: assistantMessageItem.id,
+            ...(assistantMessageSeed && {
+              agentId: assistantMessageSeed.agentId,
+              groupId: assistantMessageSeed.groupId,
+              model: assistantMessageSeed.model,
+              parentId: assistantMessageSeed.parentId,
+              provider: assistantMessageSeed.provider,
+              role: assistantMessageSeed.role,
+              threadId: assistantMessageSeed.threadId,
+              topicId: assistantMessageSeed.topicId,
+            }),
+          },
+          model,
+          provider,
+          ...(stepLabel && { stepLabel }),
         },
-        model,
-        provider,
-        ...(stepLabel && { stepLabel }),
-      },
-      stepIndex,
-      type: 'stream_start',
-    });
+        stepIndex,
+        type: 'stream_start',
+      });
+    }
 
     try {
       type ContentPart = { text: string; type: 'text' } | { image: string; type: 'image' };
