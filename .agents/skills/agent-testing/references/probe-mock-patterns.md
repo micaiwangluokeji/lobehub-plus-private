@@ -661,6 +661,27 @@ executionTarget: 'local'` in `agencyConfig`) + one message per case asking CC to
   just added (`curl -s 127.0.0.1:<vitePort>/src/path/File.tsx | grep -c myNewSymbol`) before blaming the
   code. `electron-dev.sh stop <id>` then start again to get a clean server.
 
+### E8b. The standalone `apps/desktop` install BREAKS the root workspace's type resolution — re-run the root install after it
+
+- **Situation**: a worktree set up per E8 (`pnpm install` at the root, then
+  `cd apps/desktop && pnpm install`). Everything runs — Electron boots, the renderer serves live
+  code — but a full `bun run type-check` that passed BEFORE the desktop install now fails with
+  dozens of errors that have nothing to do with the change under test:
+  `Module '"@lobechat/types"' has no exported member 'MetaData' | 'HotkeyId' | …` plus
+  `Type 'UserHotkeyConfig' is missing the following properties from type 'UserHotkeyConfig'` —
+  the same name on both sides, i.e. **two copies of `@lobechat/types` in one program**.
+- **Doesn't work**: chasing it as a code defect, or checking the symlink
+  (`node_modules/@lobechat/types → ../../packages/types` looks correct) and `packages/types/node_modules`
+  (its deps are all present). Both look fine while the program still sees two instances.
+- **Cause**: `apps/desktop` is NOT in the root pnpm workspace (see E8). Its standalone install
+  re-resolves the `packages/*` links from its own lockfile and rewrites shared package deps under
+  `packages/*/node_modules`, leaving the root workspace pointing at a second instance.
+- **Works**: run `pnpm install` at the worktree root ONE MORE TIME, after the desktop install
+  (\~1.5 min, mostly cached). Type-check goes back to 0 errors and Electron keeps working.
+  So the safe order is: root install → desktop install → root install again. And never publish a
+  "type-check failed" verdict from a worktree until you've re-run the root install — the failure is
+  environmental, and the error text (a type "missing properties from" itself) is the tell.
+
 ### E9. Electron dev's FIRST cold boot sits on the splash with an empty `#root` for 1–3 minutes
 
 - **Situation**: after `electron-dev.sh start <id>`, `app-probe.sh auth` returns `isSignedIn:false`,
@@ -1022,3 +1043,52 @@ nodeintegration, plugins, disablewebsecurity, allowpopups, preload, …`). The h
 - **Works**: seed an `agents` row and set `topics.agent_id` (and `messages.agent_id`)
   before opening the share page. Verify the fetch actually fired via
   `agent-browser network requests | grep getMessages`, not by waiting on the UI.
+### E15. ✅ Next dev does NOT hot-reload `apps/server/**` — you are testing STALE compiled server code
+
+- **Situation**: verifying a working-tree change inside `apps/server/src/**` (an agent-runtime
+  service, a tool executor, a router) against a `bun run dev` server that was started before the
+  edit. The app behaves normally, the feature simply does nothing.
+- **Doesn't work**: assuming HMR covers it because `@/server/*` maps to `apps/server/src/*` in
+  `tsconfig.json` (source, no `dist`), so it "should" recompile. It does not, at least for large
+  service files. Measured: a `console.error` added at the top of a code path that demonstrably ran
+  (child ops were created, the DB rows appeared) printed **zero** lines across four separate runs;
+  after a dev-server restart, the same line printed on the first run. The whole feature under test
+  had never executed once.
+- **Why this is a trap and not a nuisance**: the failure mode is silent and looks exactly like a
+  logic bug. You will go hunting in your own diff for a fault that is not there.
+- **Works**: after ANY edit under `apps/server/**`, restart the dev server before drawing a
+  conclusion. If a run "should" have hit your code and didn't, prove the server is running your
+  code FIRST — drop a `console.error` on the path and restart — before debugging the code itself.
+
+### E16. ✅ `source`-ing an unquoted JSON env var silently corrupts it (JWKS\_KEY → gateway auth\_failed)
+
+- **Situation**: writing an env file for the local gateway loop with
+  `JWKS_KEY={"keys":[{"kty":"RSA",...}]}` on one line, then `set -a; source that-file`.
+- **Doesn't work**: the shell strips every double quote from an unquoted assignment, so the process
+  receives `{keys:[{kty:RSA,...}]}` — invalid JSON. `getJwksKey()` (`packages/trpc/src/utils/internalJwt.ts:13-20`)
+  throws on `JSON.parse`, `signUserJWT` throws, and the server hands the client an **empty** gateway
+  token. The browser sends `{"token":"","type":"auth"}` and the gateway answers `auth_failed`.
+- **What makes it genuinely deceptive**: `local-gateway-setup.sh` and `local-gateway-probe.mjs` read
+  `JWKS_KEY` out of the file with a **regex**, not by sourcing it — so both are unaffected. The probe
+  cheerfully prints `✅ auth_success` while the real browser path is broken. A green probe is NOT
+  evidence the app's own token works.
+- **Works**: single-quote the value in the env file (`export JWKS_KEY='{"keys":[...]}'`) and prove the
+  round-trip before starting the server:
+  ```bash
+  (source env-file && node -e 'JSON.parse(process.env.JWKS_KEY); console.log("ok")')
+  ```
+  To diagnose an `auth_failed`, hook `ws.send` in the page and read the token the client actually
+  sends — an empty string means the SERVER failed to sign, not that the gateway rejected a signature.
+
+### E17. The chat input silently refuses to send when the agent's model is retired
+
+- **Situation**: driving a real turn (store `sendMessage` or type+Enter). The call resolves, no error
+  is thrown, `activeTopicId` stays `null`, and no `agent_operations` row appears. Nothing in the dev
+  server log — the request is never even issued.
+- **Cause**: the composer shows a small inline warning ("当前模型已下线。请选择其他模型后继续使用。")
+  and disables send. A model id that was valid a while ago (e.g. `deepseek-chat`) can be retired from
+  the model bank while the agent row still points at it.
+- **Works**: read the actually-enabled models out of the store before configuring a fixture agent —
+  `window.__LOBE_STORES.aiInfra().enabledChatModelList` → `[{id: provider, children: [{id: model}]}]` —
+  and pick one from there. Also: a send that "resolves fine but creates no operation" is a UI-gate
+  symptom; **screenshot the composer** instead of re-reading your store call.
