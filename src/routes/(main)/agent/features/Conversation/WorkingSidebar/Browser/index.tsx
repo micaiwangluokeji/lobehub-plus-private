@@ -1,15 +1,19 @@
 import { isDesktop } from '@lobechat/const';
+import { nanoid } from '@lobechat/utils';
 import { ActionIcon, Center, Empty, Flexbox, Icon, Input, Text } from '@lobehub/ui';
-import { Button } from '@lobehub/ui/base-ui';
+import { Button, DropdownMenu } from '@lobehub/ui/base-ui';
 import { createStaticStyles } from 'antd-style';
 import {
   Camera,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
+  FileText,
   Globe,
   Import,
+  MessageCirclePlus,
   RefreshCw,
+  TextSelect,
   XCircle,
 } from 'lucide-react';
 import { memo, useEffect, useRef, useState } from 'react';
@@ -19,21 +23,62 @@ import { message } from '@/components/AntdStaticMethods';
 import { BrowserIcon } from '@/components/BrowserIcon';
 import { DESKTOP_HEADER_ICON_SMALL_SIZE } from '@/const/layoutTokens';
 import { useLocalStorageState } from '@/hooks/useLocalStorageState';
+import { electronBrowserControlService } from '@/services/electron/browserControl';
 import { electronBrowserSidebarService } from '@/services/electron/browserSidebar';
+import { useChatStore } from '@/store/chat';
+import { useFileStore } from '@/store/file';
 import { useGlobalStore } from '@/store/global';
 
-import AgentOverlay from './AgentOverlay';
-import {
-  BROWSER_IMPORT_BANNER_DISMISSED_STORAGE_KEY,
-  BROWSER_WEBVIEW_PARTITION,
-  BROWSER_WEBVIEW_SESSION_ATTRIBUTE,
-} from './const';
+import { BROWSER_IMPORT_BANNER_DISMISSED_STORAGE_KEY } from './const';
 import { useBrowserSidebarState } from './useBrowserSidebarState';
-import { normalizeBrowserUrl } from './utils';
-
-type WebviewElement = HTMLElement & { getWebContentsId: () => number };
+import { createBrowserContext, normalizeBrowserUrl } from './utils';
 
 const styles = createStaticStyles(({ css, cssVar }) => ({
+  loadingBar: css`
+    pointer-events: none;
+
+    position: absolute;
+    z-index: 3;
+    /* Anchored to the toolbar's bottom border — the page container below is
+       covered by the WebContentsView, which paints above renderer DOM. */
+    inset-block-end: -1px;
+    inset-inline: 0;
+
+    overflow: hidden;
+
+    height: 2px;
+
+    &::after {
+      content: '';
+
+      position: absolute;
+      inset-block: 0;
+      inset-inline-start: 0;
+
+      width: 36%;
+
+      background: ${cssVar.colorInfo};
+
+      animation: browser-loading-progress 1.15s ease-in-out infinite;
+    }
+
+    @keyframes browser-loading-progress {
+      from {
+        transform: translateX(-110%);
+      }
+
+      to {
+        transform: translateX(310%);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      &::after {
+        width: 100%;
+        animation: none;
+      }
+    }
+  `,
   container: css`
     position: relative;
 
@@ -46,7 +91,10 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     background: ${cssVar.colorBgLayout};
   `,
   toolbar: css`
+    position: relative;
+
     flex-shrink: 0;
+
     min-height: 56px;
     padding-inline: 16px;
     border-block-end: 1px solid ${cssVar.colorBorderSecondary};
@@ -64,7 +112,9 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     }
   `,
   importBanner: css`
+    container-type: inline-size;
     flex-shrink: 0;
+    flex-wrap: wrap;
 
     min-height: 72px;
     padding-block: 12px;
@@ -77,16 +127,23 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
     flex: 1;
     min-width: 0;
   `,
+  importActions: css`
+    margin-inline-start: auto;
+
+    @container (max-width: 480px) {
+      flex-basis: 100%;
+      justify-content: flex-end;
+      margin-inline-start: 44px;
+    }
+  `,
   toolbarActions: css`
     margin-inline-start: auto;
   `,
-  webview: css`
+  /* The page itself is a main-process WebContentsView laid over this element —
+     nothing renders inside it. It exists to be measured. */
+  viewport: css`
     position: absolute;
     inset: 0;
-
-    width: 100%;
-    height: 100%;
-    border: 0;
   `,
 }));
 
@@ -96,15 +153,7 @@ interface BrowserPaneProps {
 
 const BrowserPane = memo<BrowserPaneProps>(({ sessionId }) => {
   const { t } = useTranslation('chat');
-  // The webview always mounts on a constant about:blank; the real first
-  // navigation is issued through the controller IPC once the guest is attached,
-  // so user-typed text never reaches the src attribute (a DOM-XSS sink). Later
-  // navigations go through the same IPC so the guest page doesn't remount.
-  // `initialUrl === undefined` renders the empty state instead of a webview;
-  // its value only seeds the address bar until the first state broadcast.
-  const [initialUrl, setInitialUrl] = useState<string>();
-  const pendingUrl = useRef<string>(undefined);
-  const state = useBrowserSidebarState(sessionId, initialUrl);
+  const state = useBrowserSidebarState(sessionId);
   const [address, setAddress] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -114,42 +163,76 @@ const BrowserPane = memo<BrowserPaneProps>(({ sessionId }) => {
   );
   const browserRequest = useGlobalStore((s) => s.status.workingSidebarBrowserRequest);
   const consumedNonce = useRef<number>(undefined);
-  const webviewRef = useRef<WebviewElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
 
-  // will-attach-webview only sees standard attributes, so the main process
-  // can't learn the sessionId there — bind it explicitly once the guest exists.
-  // The pending first navigation rides on a successful attach.
+  // The page lives in the main process, so it exists as soon as anything has
+  // navigated it — including an agent the user has never watched.
+  const hasPage = state.attached || (!!state.url && state.url !== 'about:blank');
+
+  // The overlay is drawn inside the page (a WebContentsView paints above all
+  // renderer DOM, so it can't be drawn here any more) — hand the copy over.
   useEffect(() => {
-    const el = webviewRef.current;
-    if (!el) return;
+    if (!isDesktop) return;
+    void electronBrowserSidebarService.setOverlayLabels({
+      controlling: t('workingPanel.browser.agentControlling'),
+      cursor: t('workingPanel.browser.agentCursor'),
+    });
+  }, [t]);
 
-    const handleDomReady = () => {
-      const webContentsId = el.getWebContentsId();
-      electronBrowserSidebarService
-        .attach({ sessionId, webContentsId })
-        .then((result) => {
-          if (!result.success) return;
-          const pending = pendingUrl.current;
-          pendingUrl.current = undefined;
-          if (pending) return electronBrowserSidebarService.navigate({ sessionId, url: pending });
-        })
-        .catch((error) => {
-          console.error('[BrowserSidebar] Failed to attach webview:', error);
-        });
+  // Tell the main process where to lay the page out. Polled rather than observed
+  // because the panel also moves when nothing about it resizes (the left sidebar
+  // collapsing shifts its x), and a ResizeObserver would sleep through that.
+  // A zero-sized rect — which is what `display: none` reports when another tab is
+  // active — parks the page off-screen instead of destroying it.
+  useEffect(() => {
+    if (!isDesktop || !hasPage) return;
+
+    let frame = 0;
+    let lastKey = '';
+
+    const tick = () => {
+      const element = viewportRef.current;
+      if (element) {
+        const rect = element.getBoundingClientRect();
+        const visible = rect.width >= 1 && rect.height >= 1;
+        // devicePixelRatio tracks the app zoom level, and the main process turns
+        // this CSS rect into DIP with the zoom factor. Without it in the key, a
+        // Cmd +/- that leaves the rect unchanged would strand the page at the
+        // bounds it had at the old zoom.
+        const key = visible
+          ? [rect.x, rect.y, rect.width, rect.height, window.devicePixelRatio]
+              .map((value) => Math.round(value * 100))
+              .join(',')
+          : 'parked';
+
+        if (key !== lastKey) {
+          lastKey = key;
+          void electronBrowserSidebarService.setViewport({
+            rect: visible
+              ? { height: rect.height, width: rect.width, x: rect.x, y: rect.y }
+              : undefined,
+            sessionId,
+          });
+        }
+      }
+
+      frame = requestAnimationFrame(tick);
     };
 
-    el.addEventListener('dom-ready', handleDomReady);
-    return () => el.removeEventListener('dom-ready', handleDomReady);
-  }, [initialUrl, sessionId]);
+    frame = requestAnimationFrame(tick);
 
-  // The pane is keyed by session, so switching agents back remounts it with
-  // empty local state while the main process still holds the session's page.
-  // Bring the webview back on the recorded URL instead of an empty pane.
-  useEffect(() => {
-    if (initialUrl || !state.url || state.url === 'about:blank') return;
-    pendingUrl.current = state.url;
-    setInitialUrl(state.url);
-  }, [initialUrl, state.url]);
+    // Nothing here handles "the same agent is open in another window, which took
+    // the page": the rect never changes, so this loop stays silent. The main
+    // process reclaims the page on the window's own `focus` event — a renderer
+    // `focus` listener does not fire when you switch between two windows of the
+    // same app (measured), so it cannot be the trigger.
+
+    return () => {
+      cancelAnimationFrame(frame);
+      // Park rather than close: the agent may still be driving this page.
+      void electronBrowserSidebarService.setViewport({ sessionId });
+    };
+  }, [hasPage, sessionId]);
 
   useEffect(() => {
     if (!isEditing) setAddress(state.url === 'about:blank' ? '' : state.url);
@@ -170,14 +253,51 @@ const BrowserPane = memo<BrowserPaneProps>(({ sessionId }) => {
   const openUrl = (rawUrl: string) => {
     const url = normalizeBrowserUrl(rawUrl);
     setAddress(url);
-
-    if (!initialUrl) {
-      pendingUrl.current = url;
-      setInitialUrl(url);
-      return;
-    }
-
     void runAction(() => electronBrowserSidebarService.navigate({ sessionId, url }));
+  };
+
+  const addPageContext = async (selected: boolean) => {
+    try {
+      const result = await electronBrowserControlService.readPage({ sessionId });
+      if (!result.success) {
+        message.error(result.error || t('workingPanel.browser.context.failed'));
+        return;
+      }
+
+      const content = selected ? result.selectedText : result.content;
+      if (!content?.trim()) {
+        message.info(
+          t(
+            selected
+              ? 'workingPanel.browser.context.noSelection'
+              : 'workingPanel.browser.context.noContent',
+          ),
+        );
+        return;
+      }
+
+      useFileStore.getState().addChatContextSelection(
+        createBrowserContext({
+          content,
+          id: `browser-context-${nanoid(6)}`,
+          pageTitle: result.title,
+          selected,
+          selectionTitle: t('workingPanel.browser.context.selectionTitle'),
+          url: result.url,
+        }),
+      );
+      message.success(
+        t(
+          selected
+            ? 'workingPanel.browser.context.selectionAdded'
+            : 'workingPanel.browser.context.pageAdded',
+        ),
+      );
+      window.setTimeout(() => useChatStore.getState().mainInputEditor?.focus(), 160);
+    } catch (error) {
+      console.error('[BrowserSidebar] Failed to add browser context:', error);
+      message.error(t('workingPanel.browser.context.failed'));
+    }
   };
 
   const handleImportChromeLoginData = async () => {
@@ -272,6 +392,31 @@ const BrowserPane = memo<BrowserPaneProps>(({ sessionId }) => {
           }}
         />
         <Flexbox horizontal align={'center'} className={styles.toolbarActions} gap={4}>
+          <DropdownMenu
+            iconSpaceMode={'group'}
+            placement={'bottomRight'}
+            items={[
+              {
+                icon: <TextSelect size={16} />,
+                key: 'selection',
+                label: t('workingPanel.browser.context.addSelection'),
+                onClick: () => void addPageContext(true),
+              },
+              {
+                icon: <FileText size={16} />,
+                key: 'page',
+                label: t('workingPanel.browser.context.addPage'),
+                onClick: () => void addPageContext(false),
+              },
+            ]}
+          >
+            <ActionIcon
+              disabled={!state.attached || state.isLoading}
+              icon={MessageCirclePlus}
+              size={DESKTOP_HEADER_ICON_SMALL_SIZE}
+              title={t('workingPanel.browser.context.add')}
+            />
+          </DropdownMenu>
           <ActionIcon
             disabled={!state.attached}
             icon={ExternalLink}
@@ -297,6 +442,17 @@ const BrowserPane = memo<BrowserPaneProps>(({ sessionId }) => {
             }
           />
         </Flexbox>
+        {/* Sits on the toolbar's edge, not inside the page container: a
+            WebContentsView paints above all renderer DOM, so a bar drawn over the
+            page area would be hidden the moment a page is showing. */}
+        {state.isLoading && (
+          <div
+            aria-label={t('workingPanel.browser.loading')}
+            aria-valuetext={t('workingPanel.browser.loading')}
+            className={styles.loadingBar}
+            role="progressbar"
+          />
+        )}
       </Flexbox>
       {!isImportBannerDismissed && (
         <Flexbox horizontal align={'center'} className={styles.importBanner} gap={12}>
@@ -307,32 +463,26 @@ const BrowserPane = memo<BrowserPaneProps>(({ sessionId }) => {
               {t('workingPanel.browser.import.desc')}
             </Text>
           </Flexbox>
-          <Button
-            icon={<Icon icon={Import} />}
-            loading={isImporting}
-            onClick={handleImportChromeLoginData}
-          >
-            {t('workingPanel.browser.import.action')}
-          </Button>
-          <ActionIcon
-            icon={XCircle}
-            size={DESKTOP_HEADER_ICON_SMALL_SIZE}
-            title={t('workingPanel.browser.import.dismiss')}
-            onClick={() => setIsImportBannerDismissed(true)}
-          />
+          <Flexbox horizontal align={'center'} className={styles.importActions} gap={4}>
+            <Button
+              icon={<Icon icon={Import} />}
+              loading={isImporting}
+              onClick={handleImportChromeLoginData}
+            >
+              {t('workingPanel.browser.import.action')}
+            </Button>
+            <ActionIcon
+              icon={XCircle}
+              size={DESKTOP_HEADER_ICON_SMALL_SIZE}
+              title={t('workingPanel.browser.import.dismiss')}
+              onClick={() => setIsImportBannerDismissed(true)}
+            />
+          </Flexbox>
         </Flexbox>
       )}
       <Flexbox className={styles.container}>
-        <AgentOverlay sessionId={sessionId} />
-        {initialUrl ? (
-          <webview
-            className={styles.webview}
-            key={sessionId}
-            partition={BROWSER_WEBVIEW_PARTITION}
-            ref={webviewRef}
-            src={'about:blank'}
-            {...{ [BROWSER_WEBVIEW_SESSION_ATTRIBUTE]: sessionId }}
-          />
+        {hasPage ? (
+          <div className={styles.viewport} ref={viewportRef} />
         ) : (
           <Center height={'100%'} width={'100%'}>
             <Empty

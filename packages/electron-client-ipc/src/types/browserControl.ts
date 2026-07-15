@@ -52,6 +52,7 @@ export interface BrowserControlScreenshotResult extends BrowserControlResult {
 
 export interface BrowserControlReadPageResult extends BrowserControlResult, BrowserControlPageInfo {
   content?: string;
+  selectedText?: string;
 }
 
 export interface BrowserControlWaitForParams extends BrowserControlParams {
@@ -83,16 +84,4 @@ export interface BrowserGatewayToolCallPayload {
 export interface BrowserGatewayToolResultParams {
   requestId: string;
   result: BrowserToolCallResult;
-}
-
-export interface BrowserSidebarAgentStatePayload {
-  active: boolean;
-  sessionId: string;
-}
-
-export interface BrowserSidebarAgentCursorPayload {
-  click?: boolean;
-  sessionId: string;
-  x: number;
-  y: number;
 }
