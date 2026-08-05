@@ -24,6 +24,15 @@ const NANO_BANANA_MODEL_PATTERN = /^nano-banana[-.:]?([a-z0-9]+(?:[-.:][a-z0-9]+
 
 const SAFETY_OFF_MODELS = new Set(['gemini-2.0-flash-exp']);
 
+// Gemini 3.5 Flash-Lite and Gemini 3.6+ deprecate sampling controls and thinking budgets.
+// https://ai.google.dev/gemini-api/docs/generate-content/latest-model
+const MODELS_WITH_DEPRECATED_GENERATION_PARAMS = new Set(['gemini-3.5-flash-lite']);
+
+const ALIASES_WITH_DEPRECATED_GENERATION_PARAMS = new Set([
+  'gemini-flash-latest',
+  'gemini-flash-lite-latest',
+]);
+
 const IMAGE_RESPONSE_MODEL_ALIASES = new Set(['gemini-2.0-flash-exp', 'nano-banana-pro-preview']);
 
 const LOBE_IMAGE_MODEL_ID_SUFFIX = ':image';
@@ -41,7 +50,10 @@ const NANO_BANANA_MODEL_ALIASES = new Set([
 
 // These models need the explicit image/web searchTypes payload when googleSearch is enabled.
 // Other search-capable models use the plain `{ googleSearch: {} }` shape.
-const IMAGE_SEARCH_TYPES_MODELS = new Set(['gemini-3.1-flash-image-preview']);
+const IMAGE_SEARCH_TYPES_MODELS = new Set([
+  'gemini-3.1-flash-image',
+  'gemini-3.1-flash-image-preview',
+]);
 
 // Models verified to reject systemInstruction/thinkingConfig. Other cases are derived below
 // only when the model-id shape is stable enough to avoid a release-time code change.
@@ -196,6 +208,16 @@ export const isGeminiVersionAtLeast = (
 };
 
 export const isGemini3OrAbove = (model?: string): boolean => isGeminiVersionAtLeast(model, 3);
+
+export const shouldOmitDeprecatedGoogleGenerationParams = (model: string): boolean => {
+  const normalizedModelId = normalizeGoogleModelId(model);
+
+  return (
+    (!!normalizedModelId && MODELS_WITH_DEPRECATED_GENERATION_PARAMS.has(normalizedModelId)) ||
+    (!!normalizedModelId && ALIASES_WITH_DEPRECATED_GENERATION_PARAMS.has(normalizedModelId)) ||
+    isGeminiVersionAtLeast(model, 3, 6)
+  );
+};
 
 export const isGoogleSafetyOffModel = (model: string): boolean => {
   const normalizedModelId = normalizeGoogleModelId(model);
