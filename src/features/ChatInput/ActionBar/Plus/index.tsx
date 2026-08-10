@@ -23,7 +23,7 @@ import {
   TypeIcon,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { openAttachKnowledgeModal } from '@/features/LibraryModal';
@@ -33,7 +33,6 @@ import { useModelSupportToolUse } from '@/hooks/useModelSupportToolUse';
 import { useAgentStore } from '@/store/agent';
 import { agentSelectors, chatConfigByIdSelectors } from '@/store/agent/selectors';
 import { aiModelSelectors, aiProviderSelectors, useAiInfraStore } from '@/store/aiInfra';
-import { useChatStore } from '@/store/chat';
 import { useFileStore } from '@/store/file';
 import { useGlobalStore } from '@/store/global';
 import { systemStatusSelectors } from '@/store/global/selectors';
@@ -45,18 +44,19 @@ import {
 import { useUserStore } from '@/store/user';
 import { labPreferSelectors, settingsSelectors } from '@/store/user/selectors';
 
-import { useGoalArmStore } from '../../../Conversation/ChatInput/VerifyTray/goalArmStore';
-import { openTopicGoalModal } from '../../../Conversation/ChatInput/VerifyTray/useTopicChecklist';
 import { useAgentId } from '../../hooks/useAgentId';
 import { useChatInputResourceAccess } from '../../hooks/useChatInputResourceAccess';
 import { useEffectiveModel } from '../../hooks/useEffectiveModel';
 import { useUpdateAgentConfig } from '../../hooks/useUpdateAgentConfig';
+import { enterGoalMode } from '../../InputEditor/goalMode';
 import { useChatInputStore } from '../../store';
 import { type ActionDropdownMenuItems } from '../components/ActionDropdown';
 import { ChatInputAction } from '../components/ChatInputAction';
+import GoalModeChip from '../GoalModeChip';
 import { useControls as useKnowledgeControls } from '../Knowledge/useControls';
 import { useMemoryEnabled } from '../Memory/useMemoryEnabled';
 import { useControls as useToolsControls } from '../Tools/useControls';
+import { useEffortMenuItem } from './useEffortMenuItem';
 
 const hotArea = css`
   &::before {
@@ -295,12 +295,8 @@ const usePlusMenuItems = ({ close }: { close: () => void }): ActionDropdownMenuI
   const { canConfigureResource } = useChatInputResourceAccess();
   const { updateAgentChatConfig } = useUpdateAgentConfig();
 
-  // Topic acceptance (lab): a "new acceptance item" entry in the "+" menu, so a
-  // topic's checklist starts from here instead of an always-on strip above the
-  // composer. Global stores only — Plus renders on surfaces without conversation
-  // context.
+  // Goal creation is lab-gated while the product surface is being rolled out.
   const enableTopicAcceptance = useUserStore(labPreferSelectors.enableTopicAcceptance);
-  const activeTopicId = useChatStore((s) => s.activeTopicId);
 
   const upload = useFileStore((s) => s.uploadChatFiles);
   const { enableKnowledgeBase } = useServerConfigStore(featureFlagsSelectors);
@@ -332,6 +328,7 @@ const usePlusMenuItems = ({ close }: { close: () => void }): ActionDropdownMenuI
   const isMemoryEnabled = useMemoryEnabled(agentId);
   const [showTypoBar, setShowTypoBar] = useChatInputStore((s) => [s.showTypoBar, s.setShowTypoBar]);
   const editor = useChatInputStore((s) => s.editor);
+  const setGoalMode = useChatInputStore((s) => s.setGoalMode);
   const { canUploadImage, canUploadVideo, canUploadAudio } = useMediaUploadAbility(
     model,
     provider,
@@ -398,6 +395,8 @@ const usePlusMenuItems = ({ close }: { close: () => void }): ActionDropdownMenuI
     },
     [updateAgentChatConfig],
   );
+
+  const effortItem = useEffortMenuItem();
 
   const handleToggleParams = useCallback(() => {
     close();
@@ -658,6 +657,10 @@ const usePlusMenuItems = ({ close }: { close: () => void }): ActionDropdownMenuI
       },
       // Agent Gateway directly below the formatting toolbar.
       ...gatewayItem,
+      // Reasoning intensity — a personal per-model preference, so it is NOT
+      // gated on canConfigureResource; hidden only when the model has no
+      // reasoning extend params (the hook returns []).
+      ...effortItem,
       // Advanced parameter settings — only when resources can be configured.
       ...(canConfigureResource
         ? [
@@ -704,9 +707,9 @@ const usePlusMenuItems = ({ close }: { close: () => void }): ActionDropdownMenuI
         ]
       : uploadItems;
 
-    // Before a topic exists there is nothing to persist a goal onto, so the
-    // entry *arms* the goal (the next message becomes it); once a topic exists
-    // it opens the editor directly.
+    // Goal creation has one canonical entry: put the composer in /goal mode.
+    // The agent then plans and calls lobe-goal.createGoal, regardless of whether
+    // this conversation already has a topic.
     const acceptanceItems: ActionDropdownMenuItems = enableTopicAcceptance
       ? [
           {
@@ -714,13 +717,7 @@ const usePlusMenuItems = ({ close }: { close: () => void }): ActionDropdownMenuI
             key: 'set-topic-goal',
             label: tVerify('acceptance.tray.menuSetGoal'),
             onClick: () => {
-              if (activeTopicId) {
-                void openTopicGoalModal(activeTopicId);
-              } else if (agentId) {
-                // Arm only — the persistent "armed" chip above the composer is the
-                // feedback now (the next message becomes the goal), not a toast.
-                useGoalArmStore.getState().arm(agentId);
-              }
+              enterGoalMode(editor, setGoalMode);
             },
           },
         ]
@@ -740,8 +737,8 @@ const usePlusMenuItems = ({ close }: { close: () => void }): ActionDropdownMenuI
   }, [
     agentId,
     activeSearchOption,
-    activeTopicId,
     canConfigureResource,
+    effortItem,
     enableTopicAcceptance,
     tVerify,
     canUploadImage,
@@ -762,6 +759,7 @@ const usePlusMenuItems = ({ close }: { close: () => void }): ActionDropdownMenuI
     isParamsPanelActive,
     knowledgeEnabledCount,
     setShowTypoBar,
+    setGoalMode,
     showProviderSearch,
     showTypoBar,
     skillActivateMode,
@@ -791,17 +789,20 @@ const PlusAction = memo(() => {
   const { t } = useTranslation('chat');
 
   return (
-    <ChatInputAction
-      icon={PlusIcon}
-      size={{ blockSize: 32, borderRadius: 16, size: 18 }}
-      title={t('plus.tooltip')}
-      tooltipProps={{ placement: 'top' }}
-      dropdown={{
-        menu: { useItems: usePlusMenuItems },
-        minWidth: 220,
-        placement: 'topLeft',
-      }}
-    />
+    <Fragment>
+      <ChatInputAction
+        icon={PlusIcon}
+        size={{ blockSize: 32, borderRadius: 16, size: 18 }}
+        title={t('plus.tooltip')}
+        tooltipProps={{ placement: 'top' }}
+        dropdown={{
+          menu: { useItems: usePlusMenuItems },
+          minWidth: 220,
+          placement: 'topLeft',
+        }}
+      />
+      <GoalModeChip />
+    </Fragment>
   );
 });
 

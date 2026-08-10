@@ -25,6 +25,8 @@ describe('chainOnboardingTaskRecommendation', () => {
     );
     expect(messages[0].content).toContain('Preserve repository names, product names');
     expect(messages[0].content).toContain('Never comment, submit a review, approve');
+    expect(messages[0].content).toContain('Select only the highest-value recommendations');
+    expect(messages[0].content).toContain('urgency, recurrence, user impact, and leverage');
     expect(messages[0].content).toContain('Title: Analyze mobile lifecycle risk');
     expect(messages[1].content).toContain('<connector-evidence provider="github">');
     expect(messages[1].content).toContain('{"pullRequest":1}');
@@ -40,6 +42,21 @@ describe('chainOnboardingTaskRecommendation', () => {
     expect(writing.instructionPrinciples.join('\n')).toContain('finish asynchronously');
     expect(writing.instructionPrinciples.join('\n')).toContain(
       'require a later explicit user-approved action',
+    );
+  });
+
+  /** @example Notion guidance treats page access as evidence rather than edit authorization. */
+  it('keeps Notion recommendations read-only by default', () => {
+    const notion = DEFAULT_ONBOARDING_TASK_RECOMMENDATION_PROMPT_CONFIG.providers.notion;
+    const principles = notion.principles.join('\n');
+
+    expect(principles).toContain('does not establish that the user authored');
+    expect(principles).toContain('Never edit pages');
+    expect(notion.staleWorkspacePrinciples.join('\n')).toContain(
+      'centered on coverage and freshness',
+    );
+    expect(notion.staleWorkspacePrinciples.join('\n')).toContain(
+      'Never claim that newer or unauthorized pages exist',
     );
   });
 });

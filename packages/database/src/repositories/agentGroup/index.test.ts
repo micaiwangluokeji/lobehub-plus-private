@@ -1,9 +1,10 @@
 // @vitest-environment node
 import { BUILTIN_AGENT_SLUGS } from '@lobechat/builtin-agents';
 import { eq } from 'drizzle-orm';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getTestDB } from '../../core/getTestDB';
+import { AGENT_TRANSFER_IN_PROGRESS } from '../../models/agentTransferJob';
 import { ChatGroupModel } from '../../models/chatGroup';
 import {
   TOPIC_COMMENT_TOPIC_NOT_FOUND,
@@ -11,6 +12,7 @@ import {
   TopicCommentModel,
 } from '../../models/topicComment';
 import { agents } from '../../schemas/agent';
+import { agentHistoryJobAgents, agentHistoryJobs } from '../../schemas/agentHistoryJob';
 import { chatGroups, chatGroupsAgents } from '../../schemas/chatGroup';
 import { messagePlugins, messages } from '../../schemas/message';
 import { threads, topics } from '../../schemas/topic';
@@ -31,12 +33,21 @@ const isServerDB = process.env.TEST_SERVER_DB === '1';
 beforeEach(async () => {
   // Clean up
   await serverDB.delete(users);
+  // Jobs deliberately carry no FK onto users, so `delete(users)` leaves them
+  // behind. On the shared server DB (`singleFork`) a stray pending job would
+  // outlive this file and trip the transfer/removal guards in the next one.
+  await serverDB.delete(agentHistoryJobs);
+  delete process.env.AGENT_COPY_SYNC_MESSAGE_THRESHOLD;
 
   // Create test users
   await serverDB.insert(users).values([{ id: userId }, { id: otherUserId }]);
 
   // Initialize repo
   agentGroupRepo = new AgentGroupRepository(serverDB, userId);
+});
+
+afterEach(async () => {
+  await serverDB.delete(agentHistoryJobs);
 });
 
 describe('AgentGroupRepository', () => {
@@ -914,6 +925,43 @@ describe('AgentGroupRepository', () => {
       });
       expect(virtualAgents).toHaveLength(0);
     });
+
+    it('refuses to remove a member a pending copy job is still writing into', async () => {
+      // The copy junction records the TARGET agent. Deleting that agent now
+      // cascades the row the drain is about to reference, so its next message
+      // insert violates `messages.agent_id` and the job retries forever —
+      // leaving the copied conversations stranded as pending.
+      const [job] = await serverDB
+        .insert(agentHistoryJobs)
+        .values({
+          agentIds: ['remove-virtual'],
+          payload: { agents: [{ newAgentId: 'remove-virtual', sourceAgentId: 'keep-agent' }] },
+          sessionIds: [],
+          sourceUserId: userId,
+          status: 'pending',
+          targetUserId: userId,
+          totalTopics: 1,
+          type: 'copy',
+        })
+        .returning({ id: agentHistoryJobs.id });
+      await serverDB
+        .insert(agentHistoryJobAgents)
+        .values({ agentId: 'remove-virtual', jobId: job.id });
+
+      await expect(
+        agentGroupRepo.removeAgentsFromGroup('remove-group', ['remove-virtual']),
+      ).rejects.toThrow(AGENT_TRANSFER_IN_PROGRESS);
+
+      // Nothing was removed or deleted — the guard aborted the whole transaction.
+      const stillLinked = await serverDB.query.chatGroupsAgents.findMany({
+        where: (cga, { eq }) => eq(cga.chatGroupId, 'remove-group'),
+      });
+      expect(stillLinked).toHaveLength(3);
+      const stillAlive = await serverDB.query.agents.findFirst({
+        where: (a, { eq }) => eq(a.id, 'remove-virtual'),
+      });
+      expect(stillAlive).toBeDefined();
+    });
   });
 
   describe('duplicate', () => {
@@ -1578,7 +1626,7 @@ describe('AgentGroupRepository', () => {
       const wsRepo = new AgentGroupRepository(serverDB, userId, workspaceId);
       const result = await wsRepo.transferToWorkspace('transfer-group', targetWorkspaceId, userId);
 
-      expect(result).toEqual({ groupId: 'transfer-group' });
+      expect(result).toEqual({ groupId: 'transfer-group', transferJobId: null });
 
       const group = await serverDB.query.chatGroups.findFirst({
         where: (cg, { eq }) => eq(cg.id, 'transfer-group'),
@@ -1620,6 +1668,48 @@ describe('AgentGroupRepository', () => {
       expect(comment.workspaceId).toBe(targetWorkspaceId);
       expect(comment.updatedAt).toEqual(originalCommentUpdatedAt);
       expect(mention.workspaceId).toBe(targetWorkspaceId);
+    });
+
+    it('aborts when the group leaves the source scope before the lock is taken', async () => {
+      // The scope check runs outside the transaction. A racing transfer small
+      // enough to take the fast path leaves no pending job behind, so the
+      // guards cannot catch it — only re-asserting the scope inside the lock
+      // can. Simulate that window: the pre-read reports the group as in-scope,
+      // but the committed row already belongs to someone else.
+      const raceTargetWorkspaceId = 'agent-group-race-ws';
+      await serverDB.insert(workspaces).values({
+        id: raceTargetWorkspaceId,
+        name: 'Race Target Workspace',
+        primaryOwnerId: userId,
+        slug: 'agent-group-race-ws',
+      });
+      await serverDB.insert(chatGroups).values({
+        id: 'moved-group',
+        title: 'Moved Group',
+        userId: otherUserId,
+      });
+
+      const staleRead = vi
+        .spyOn(serverDB.query.chatGroups, 'findFirst')
+        .mockResolvedValueOnce({ id: 'moved-group', title: 'Moved Group', userId } as never);
+
+      try {
+        const result = await agentGroupRepo.transferToWorkspace(
+          'moved-group',
+          raceTargetWorkspaceId,
+          userId,
+        );
+        expect(result).toBeNull();
+      } finally {
+        staleRead.mockRestore();
+      }
+
+      // Untouched: no second transfer ran off the stale state.
+      const group = await serverDB.query.chatGroups.findFirst({
+        where: (cg, { eq }) => eq(cg.id, 'moved-group'),
+      });
+      expect(group!.userId).toBe(otherUserId);
+      expect(group!.workspaceId).toBeNull();
     });
 
     it('flags teammate-authored comments as foreign transfer rows', async () => {
@@ -1965,6 +2055,124 @@ describe('AgentGroupRepository', () => {
       });
       expect(copiedPlugin?.toolCallId).not.toBe('toolu_old');
       expect(copiedPlugin?.workspaceId).toBe(targetWorkspaceId);
+    });
+
+    it('copies a conversation history larger than one insert batch and backfills cross-batch parent references', async () => {
+      // Regression: an unchunked INSERT of a large history overflows PostgreSQL's
+      // 65,535 bind-parameter cap per statement; chunked inserts must also keep
+      // self-referential FKs valid when a reference points into a later batch.
+      const targetWorkspaceId = 'agent-group-copy-large-target-ws';
+      await serverDB.insert(workspaces).values({
+        id: targetWorkspaceId,
+        name: 'Copy Large Target Workspace',
+        primaryOwnerId: userId,
+        slug: 'agent-group-copy-large-target-ws',
+      });
+
+      await serverDB.insert(chatGroups).values({
+        id: 'copy-large-group',
+        title: 'Copy Large Group',
+        userId,
+        workspaceId,
+      });
+      await serverDB.insert(agents).values({
+        id: 'copy-large-member',
+        title: 'Member',
+        userId,
+        virtual: false,
+        workspaceId,
+      });
+      await serverDB.insert(chatGroupsAgents).values({
+        agentId: 'copy-large-member',
+        chatGroupId: 'copy-large-group',
+        order: 0,
+        role: 'participant',
+        userId,
+        workspaceId,
+      });
+      await serverDB.insert(topics).values({
+        groupId: 'copy-large-group',
+        id: 'copy-large-topic',
+        title: 'Large topic',
+        userId,
+        workspaceId,
+      });
+
+      // This case exercises the SYNCHRONOUS copy's batching, so the fast/slow
+      // threshold is lifted above the seeded volume — otherwise a history this
+      // large would be deferred to a copy job and nothing would be inserted
+      // inline (the async path has its own coverage in
+      // `__tests__/groupHistoryJob.test.ts`).
+      process.env.AGENT_COPY_SYNC_MESSAGE_THRESHOLD = '100000';
+
+      // 2401 rows × 31 `messages` columns ≈ 74k bind parameters — above the
+      // 65,535 cap, so the pre-fix unbatched INSERT provably fails here.
+      const messageCount = 2401;
+      const base = Date.parse('2026-01-01T00:00:00Z');
+      const sourceRows = Array.from({ length: messageCount }, (_, i) => ({
+        content: `msg ${i}`,
+        createdAt: new Date(base + i * 1000),
+        groupId: 'copy-large-group',
+        id: `copy-large-msg-${String(i).padStart(4, '0')}`,
+        // odd rows reply to the previous row; row 0 gets a forward reference
+        // (backfilled below) to a row that lands in a LATER insert batch when
+        // copying with 500-row batches (index 700 → batch 2)
+        parentId: i % 2 === 1 ? `copy-large-msg-${String(i - 1).padStart(4, '0')}` : null,
+        role: i % 2 === 0 ? 'user' : 'assistant',
+        topicId: 'copy-large-topic',
+        // explicit historical stamps so the cross-batch fixup UPDATE would
+        // visibly restamp them if it forgot to restate `updatedAt`
+        updatedAt: new Date(base + i * 1000),
+        userId,
+        workspaceId,
+      }));
+      for (let i = 0; i < sourceRows.length; i += 400) {
+        await serverDB.insert(messages).values(sourceRows.slice(i, i + 400));
+      }
+      await serverDB
+        .update(messages)
+        // restate updatedAt: this seeding backfill would otherwise restamp the
+        // source row via $onUpdate before the copy even runs
+        .set({ parentId: 'copy-large-msg-0700', updatedAt: new Date(base) })
+        .where(eq(messages.id, 'copy-large-msg-0000'));
+
+      const wsRepo = new AgentGroupRepository(serverDB, userId, workspaceId);
+      const result = await wsRepo.copyToWorkspace('copy-large-group', targetWorkspaceId, userId, {
+        includeConversationHistory: true,
+      });
+
+      expect(result).not.toBeNull();
+
+      const copiedMessages = await serverDB.query.messages.findMany({
+        where: (message, { eq }) => eq(message.groupId, result!.groupId),
+      });
+      expect(copiedMessages).toHaveLength(messageCount);
+      expect(copiedMessages.every((message) => message.workspaceId === targetWorkspaceId)).toBe(
+        true,
+      );
+      expect(copiedMessages.some((message) => message.id.startsWith('copy-large-msg-'))).toBe(
+        false,
+      );
+
+      const copiedByContent = new Map(copiedMessages.map((message) => [message.content, message]));
+      const copiedIds = new Set(copiedMessages.map((message) => message.id));
+
+      // the deferred fixup UPDATE restated `updatedAt` instead of letting
+      // `$onUpdate` restamp the cross-batch row to "now"
+      expect(copiedByContent.get('msg 0')?.updatedAt).toEqual(new Date(base));
+
+      // every in-order reply chain survived the chunked insert
+      for (let i = 1; i < messageCount; i += 2) {
+        expect(copiedByContent.get(`msg ${i}`)?.parentId).toBe(
+          copiedByContent.get(`msg ${i - 1}`)?.id,
+        );
+      }
+      // the forward reference into a later batch was backfilled after insert
+      expect(copiedByContent.get('msg 0')?.parentId).toBe(copiedByContent.get('msg 700')?.id);
+      // no copied parentId points outside the copied set
+      for (const message of copiedMessages) {
+        if (message.parentId) expect(copiedIds.has(message.parentId)).toBe(true);
+      }
     });
 
     it('removes workspace virtual agents created by another member', async () => {

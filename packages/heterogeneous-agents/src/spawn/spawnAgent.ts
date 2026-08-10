@@ -1,9 +1,12 @@
 import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 
 import type { AgentStreamEvent } from '@lobechat/agent-gateway-client';
 
+import { resolveHeterogeneousAgentCommand } from '../config';
 import { AgentStreamPipeline, type UploadHeterogeneousImage } from './agentStreamPipeline';
+import { HETERO_WORKING_DIRECTORY_NOT_FOUND } from './classifyProcessFailure';
 import { resolveCliSpawnPlan } from './cliSpawn';
 import { readCodexSessionModel, resolveCodexInitialModel } from './codexModel';
 import type { AgentPromptInput, BuildAgentInputOptions } from './input';
@@ -294,29 +297,6 @@ const buildSpawnArgs = (params: BuildSpawnArgsParams): string[] => {
   }
 };
 
-const defaultCommand = (agentType: string): string => {
-  switch (agentType) {
-    case 'amp': {
-      return 'amp';
-    }
-    case 'codex': {
-      return 'codex';
-    }
-    case 'opencode': {
-      return 'opencode';
-    }
-    case 'pi': {
-      return 'pi';
-    }
-    case 'qoder': {
-      return 'qodercli';
-    }
-    default: {
-      return 'claude';
-    }
-  }
-};
-
 const killProcessTree = (proc: ChildProcess, signal: NodeJS.Signals): void => {
   if (!proc.pid || proc.killed) return;
 
@@ -359,7 +339,7 @@ const killProcessTree = (proc: ChildProcess, signal: NodeJS.Signals): void => {
  * failed image fetch surfaces before the child starts.
  */
 export const spawnAgent = async (options: SpawnAgentOptions): Promise<SpawnAgentHandle> => {
-  const command = options.command || defaultCommand(options.agentType);
+  const command = resolveHeterogeneousAgentCommand(options.agentType, options.command);
   const inputPlan = await buildAgentInput(options.agentType, options.prompt, options.inputOptions);
   const args = buildSpawnArgs({
     agentType: options.agentType,
@@ -369,6 +349,12 @@ export const spawnAgent = async (options: SpawnAgentOptions): Promise<SpawnAgent
     resumeSessionId: options.resumeSessionId,
   });
   const cwd = options.cwd || process.cwd();
+  if (!existsSync(cwd)) {
+    throw Object.assign(new Error(`Working directory does not exist: ${cwd}`), {
+      code: HETERO_WORKING_DIRECTORY_NOT_FOUND,
+      workingDirectory: cwd,
+    });
+  }
   const childEnv = { ...process.env, ...options.env };
   const initialModel =
     options.agentType === 'codex'
